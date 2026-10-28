@@ -1,0 +1,11 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://e5sfyb0xjjrd"]
+
+[ext_resource type="Texture2D" uid="uid://bki04eqgf5rla" path="res://resources/materials/textures/grass_albedo.tres" id="1_b71v3"]
+[ext_resource type="Texture2D" uid="uid://b6irh3wg1rt4l" path="res://resources/materials/textures/grass_normal.tres" id="2_au8fv"]
+
+[resource]
+albedo_texture = ExtResource("1_b71v3")
+normal_enabled = true
+normal_texture = ExtResource("2_au8fv")
+texture_filter = 5
+stencil_flags = 2

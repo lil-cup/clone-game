@@ -1,5 +1,9 @@
 [gd_scene format=3 uid="uid://cncprgmy4gew2"]
 
 [ext_resource type="PackedScene" uid="uid://cou1qfpk45fch" path="res://models/Cube.glb" id="1_7ufek"]
+[ext_resource type="Material" uid="uid://vvdxcx0f27wv" path="res://resources/materials/glass.tres" id="2_8viuf"]
 
 [node name="Cube" unique_id=1270881096 instance=ExtResource("1_7ufek")]
+
+[node name="Cube" parent="." index="0" unique_id=1206131383]
+material_override = ExtResource("2_8viuf")
