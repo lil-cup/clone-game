@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://bn3hoi72cqloj"]
 
-[ext_resource type="MeshLibrary" uid="uid://biavbqpwu653" path="res://models/blocks.meshlib" id="1_0xm2m"]
-[ext_resource type="Script" uid="uid://c8kugno0p6tao" path="res://scripts/grid_map.gd" id="2_h2yge"]
+[ext_resource type="MeshLibrary" uid="uid://biavbqpwu653" path="res://models/blocks.meshlib" id="1_0wfyh"]
+[ext_resource type="Script" uid="uid://c8kugno0p6tao" path="res://scripts/grid_map.gd" id="2_sugp2"]
 
 [node name="Main" type="Node3D" unique_id=1621155727]
 
@@ -20,7 +20,7 @@ transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70
 shadow_enabled = true
 
 [node name="GridMap" type="GridMap" parent="." unique_id=773752114]
-mesh_library = ExtResource("1_0xm2m")
+mesh_library = ExtResource("1_0wfyh")
 cell_octant_size = 11
-script = ExtResource("2_h2yge")
+script = ExtResource("2_sugp2")
 metadata/_editor_floor_ = Vector3(0, 0, 0)
