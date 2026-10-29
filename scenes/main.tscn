@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://bn3hoi72cqloj"]
 
-[ext_resource type="MeshLibrary" uid="uid://biavbqpwu653" path="res://models/blocks.meshlib" id="1_0wfyh"]
 [ext_resource type="Material" uid="uid://e5sfyb0xjjrd" path="res://resources/materials/grass.tres" id="1_jyhfs"]
+[ext_resource type="MeshLibrary" uid="uid://eu8uj6pse7c4" path="res://libraries/blocks.meshlib" id="2_jyhfs"]
 [ext_resource type="Script" uid="uid://c8kugno0p6tao" path="res://scripts/grid_map.gd" id="2_sugp2"]
 [ext_resource type="PackedScene" uid="uid://cncprgmy4gew2" path="res://scenes/cube.tscn" id="3_sugp2"]
 
@@ -13,7 +13,7 @@ projection = 1
 size = 70.0
 
 [node name="Floor" type="CSGBox3D" parent="." unique_id=298423759]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.030824661, -0.50000095, 0.016548157)
 material_override = ExtResource("1_jyhfs")
 use_collision = true
 size = Vector3(200, 1, 200)
@@ -23,10 +23,13 @@ transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70
 shadow_enabled = true
 
 [node name="GridMap" type="GridMap" parent="." unique_id=773752114]
-mesh_library = ExtResource("1_0wfyh")
+mesh_library = ExtResource("2_jyhfs")
 cell_octant_size = 11
+data = {
+"cells": PackedInt32Array(4, 65529, 6, 3, 3, 6, 5, 2, 6)
+}
 script = ExtResource("2_sugp2")
 metadata/_editor_floor_ = Vector3(0, 0, 0)
 
 [node name="Cube" parent="." unique_id=1270881096 instance=ExtResource("3_sugp2")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.74000883, 3.7545776, 1)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
