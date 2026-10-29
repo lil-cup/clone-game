@@ -1,15 +1,21 @@
 [gd_scene format=3 uid="uid://bn3hoi72cqloj"]
 
 [ext_resource type="Material" uid="uid://e5sfyb0xjjrd" path="res://resources/materials/grass.tres" id="1_jyhfs"]
+[ext_resource type="PackedScene" uid="uid://dgwghea4myvgd" path="res://models/conveyor/conveyor.glb" id="1_tbgi4"]
 [ext_resource type="MeshLibrary" uid="uid://eu8uj6pse7c4" path="res://resources/mesh_libraries/blocks.meshlib" id="2_jyhfs"]
 [ext_resource type="Script" uid="uid://c8kugno0p6tao" path="res://scripts/grid_map.gd" id="2_sugp2"]
+[ext_resource type="PackedScene" uid="uid://bgkef2c1qo4nw" path="res://models/conveyor/conveyor-corner.glb" id="5_tbgi4"]
+[ext_resource type="Script" uid="uid://bmnp71dfqq564" path="res://scripts/conveyor.gd" id="6_tefeu"]
+[ext_resource type="PackedScene" uid="uid://cncprgmy4gew2" path="res://scenes/cube.tscn" id="7_o6xl0"]
+
+[sub_resource type="Curve3D" id="Curve3D_tipki"]
 
 [node name="Main" type="Node3D" unique_id=1621155727]
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=2075208490]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 60, 0)
 projection = 1
-size = 70.0
+size = 74.0
 
 [node name="Floor" type="CSGBox3D" parent="." unique_id=298423759]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.030824661, -0.50000095, 0.016548157)
@@ -29,3 +35,18 @@ data = {
 }
 script = ExtResource("2_sugp2")
 metadata/_editor_floor_ = Vector3(0, 0, 0)
+
+[node name="Conveyor" type="Node3D" parent="." unique_id=1870556206 node_paths=PackedStringArray("grid")]
+script = ExtResource("6_tefeu")
+straight_scene = ExtResource("1_tbgi4")
+corner_scene = ExtResource("5_tbgi4")
+grid = NodePath("../GridMap")
+
+[node name="Path3D" type="Path3D" parent="Conveyor" unique_id=1511612153]
+curve = SubResource("Curve3D_tipki")
+
+[node name="PathFollow3D" type="PathFollow3D" parent="Conveyor/Path3D" unique_id=1951724156]
+rotation_mode = 1
+
+[node name="Cube" parent="Conveyor/Path3D/PathFollow3D" unique_id=1270881096 instance=ExtResource("7_o6xl0")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
