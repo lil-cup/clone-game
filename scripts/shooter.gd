@@ -15,6 +15,13 @@ var label: Label3D
 
 const NUMBERS_FONT := preload("res://fonts/nunito_numbers.tres")
 
+# Слой стрелков: только он отбрасывает тени (см. shadow_caster_mask у солнца в main.tscn).
+const SHADOW_LAYER := 2
+
+# Ствол: где стоит и где его кончик (оттуда вылетают снаряды), в координатах стрелка.
+const BARREL_POSITION := Vector3(0, 0.6, -1.1)
+const MUZZLE := Vector3(0, 0.6, -1.4)
+
 # Меши общие для всех стрелков: создаются один раз.
 static var body_mesh: ArrayMesh
 static var barrel_mesh: ArrayMesh
@@ -33,14 +40,16 @@ func setup(new_color: String, new_ammo: int) -> void:
 
 	var body := MeshInstance3D.new()
 	body.mesh = body_mesh
+	body.layers = SHADOW_LAYER
 	body.material_override = mat
 	body.position.y = 0.6
 	add_child(body)
 
 	var barrel := MeshInstance3D.new()
 	barrel.mesh = barrel_mesh
+	barrel.layers = SHADOW_LAYER
 	barrel.material_override = mat
-	barrel.position = Vector3(0, 0.6, -1.1)
+	barrel.position = BARREL_POSITION
 	add_child(barrel)
 
 	label = Label3D.new()
@@ -55,6 +64,11 @@ func setup(new_color: String, new_ammo: int) -> void:
 	label.position.y = 1.5
 	add_child(label)
 	update_label()
+
+
+# Кончик ствола в мировых координатах (учитывает поворот и масштаб стрелка).
+func muzzle_position() -> Vector3:
+	return to_global(MUZZLE)
 
 
 func update_label() -> void:

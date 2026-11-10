@@ -33,6 +33,7 @@ const COLUMNS := 4
 const DIFFICULTIES := [
 	{"caps": [20, 30, 40], "spread": 1.0, "shuffle": 0.0, "slots": 5, "target": 0.9},
 	{"caps": [10, 20, 30], "spread": 0.3, "shuffle": 1.0, "slots": 3, "target": 0.15},
+	{"caps": [10, 20], "spread": 0.2, "shuffle": 1.0, "slots": 3, "target": 0.08},
 ]
 
 var size := 0

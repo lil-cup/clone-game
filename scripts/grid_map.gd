@@ -39,7 +39,7 @@ func make_mesh_library() -> MeshLibrary:
 	var lib := MeshLibrary.new()
 	var id := 0
 	for color in Level.COLORS:
-		var mesh := RoundedBox.make(BLOCK_SIZE, BLOCK_RADIUS, 2)
+		var mesh := RoundedBox.make(BLOCK_SIZE, BLOCK_RADIUS, 1)
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = Level.COLORS[color]
 		mesh.surface_set_material(0, mat)

@@ -49,7 +49,7 @@ func _ready() -> void:
 	bullet_mesh.height = 0.5
 	bullet_mesh.radial_segments = 12
 	bullet_mesh.rings = 6
-	piece_mesh = RoundedBox.make(grid.BLOCK_SIZE, grid.BLOCK_RADIUS, 2)
+	piece_mesh = RoundedBox.make(grid.BLOCK_SIZE, grid.BLOCK_RADIUS, 1)
 	slots.resize(level.settings.slots)
 	grid.build_level(level)
 	conveyor.build(level.size)
@@ -244,7 +244,7 @@ func fire_projectile(s: Shooter, cell: Vector2i) -> void:
 	bullet.mesh = bullet_mesh
 	bullet.material_override = color_material(Level.COLORS[s.color].lightened(0.3))
 	add_child(bullet)
-	bullet.position = s.position + Vector3.UP * 0.6
+	bullet.position = s.muzzle_position()
 
 	var t := create_tween()
 	t.tween_property(bullet, "position", target, 0.12)
@@ -474,7 +474,7 @@ func show_result(won: bool) -> void:
 		add_button("Дальше", go_to_level.bind(level_index + 1), BUTTON_GREEN)
 	else:
 		result_title.text = "Поздравляем!"
-		result_text.text = "Все %d уровней пройдены" % Level.count()
+		result_text.text = "Все уровни пройдены\nВсего %d %s" % [Level.count(), plural(Level.count(), "уровень", "уровня", "уровней")]
 		add_button("Пройти заново", go_to_level.bind(0), BUTTON_GREEN)
 		if not OS.has_feature("web"):  # из браузера игра закрыться не может
 			add_button("Выйти", get_tree().quit, BUTTON_PURPLE)
@@ -482,6 +482,15 @@ func show_result(won: bool) -> void:
 	result_panel.show()
 	result_panel.modulate.a = 0.0
 	create_tween().tween_property(result_panel, "modulate:a", 1.0, 0.3)
+
+
+# Склонение по числу: 1 уровень, 2 уровня, 5 уровней, 21 уровень.
+func plural(n: int, one: String, few: String, many: String) -> String:
+	if n % 10 == 1 and n % 100 != 11:
+		return one
+	if n % 10 in [2, 3, 4] and not n % 100 in [12, 13, 14]:
+		return few
+	return many
 
 
 func go_to_level(index: int) -> void:

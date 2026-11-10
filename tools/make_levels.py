@@ -51,6 +51,10 @@ def minus(a, b):
 def anyof(*shapes):
     return lambda x, y: any(s(x, y) for s in shapes)
 
+def stripes(shape, k, offset=0.0):
+    """Каждая вторая диагональная полоска внутри фигуры (k — частота полосок)."""
+    return lambda x, y: shape(x, y) and int((x + y) * k + offset) % 2 == 0
+
 def everywhere(x, y):
     return True
 
@@ -286,6 +290,28 @@ def zharptica():
         ("N", circle(0.74, 0.23, 0.025)),
     ]
 
+def dome(cx, cy, r):
+    """Луковичный купол: круг снизу и острый носик сверху."""
+    return anyof(circle(cx, cy, r), poly((cx - r * 0.75, cy - r * 0.5), (cx + r * 0.75, cy - r * 0.5), (cx, cy - r * 2.1)))
+
+def sobor():
+    left, mid, right = dome(0.22, 0.42, 0.1), dome(0.5, 0.3, 0.13), dome(0.78, 0.42, 0.1)
+    return [
+        ("B", everywhere),
+        ("W", anyof(ellipse(0.12, 0.12, 0.1, 0.04), ellipse(0.85, 0.08, 0.1, 0.035))),
+        ("G", rect(0, 0.9, 1, 1)),
+        # барабаны под куполами
+        ("Y", anyof(rect(0.17, 0.5, 0.27, 0.62), rect(0.44, 0.42, 0.56, 0.62), rect(0.73, 0.5, 0.83, 0.62))),
+        ("R", anyof(rect(0.1, 0.62, 0.9, 0.92), rect(0.4, 0.55, 0.6, 0.62))),
+        ("W", anyof(*[rect(0.15 + i * 0.14, 0.7, 0.21 + i * 0.14, 0.78) for i in range(6)])),
+        ("K", both(ellipse(0.5, 0.92, 0.08, 0.12), rect(0, 0.82, 1, 0.92))),
+        ("G", left), ("Y", stripes(left, 14)),
+        ("P", mid), ("W", stripes(mid, 12)),
+        ("O", right), ("R", stripes(right, 14)),
+        ("Y", anyof(rect(0.215, 0.16, 0.225, 0.22), rect(0.495, 0.0, 0.505, 0.04), rect(0.775, 0.16, 0.785, 0.22))),
+    ]
+
+
 # (название, функция) по порядку уровней. Сложность = номер десятка.
 LEVELS = [
     ("Колобок", kolobok), ("Мухомор", muhomor), ("Снеговик", snegovik), ("Ёлка", yolka),
@@ -294,10 +320,11 @@ LEVELS = [
     ("Боровик", borovik), ("Рябина", ryabina), ("Снегирь", snegir), ("Ушанка", ushanka),
     ("Медведь", medved), ("Лиса", lisa), ("Петушок", petushok), ("Ракета", raketa),
     ("Башня", bashnya), ("Жар-птица", zharptica),
+    ("Собор", sobor),
 ]
 
 # Размер сетки для каждой сложности (по десяткам уровней).
-SIZES = [16, 20, 22, 24, 24, 26, 26, 28, 28, 30]
+SIZES = [16, 20, 24, 26, 26, 28, 28, 30, 30, 32]
 
 
 def render(layers, n):
