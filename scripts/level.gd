@@ -4,19 +4,19 @@ extends RefCounted
 # Цвета блоков и стрелков. Буква в карте уровня -> цвет.
 # Должны совпадать с PALETTE в tools/make_levels.py.
 const COLORS := {
-	"R": Color("e8434b"),
-	"W": Color("f4f1ea"),
-	"Y": Color("f2c94c"),
-	"G": Color("4cb860"),
-	"B": Color("4aa3e8"),
-	"P": Color("7b55d9"),
-	"O": Color("f2913d"),
-	"K": Color("8b5a3c"),
-	"N": Color("3a3a4a"),
-	"D": Color("2e7d4f"),
-	"S": Color("f29bb8"),
-	"A": Color("9aa3b5"),
-	"L": Color("e0b483"),
+	"R": Color("ff6b6b"),
+	"W": Color("fdfbf5"),
+	"Y": Color("ffd166"),
+	"G": Color("6bcb77"),
+	"B": Color("5ab8f0"),
+	"P": Color("9b7ede"),
+	"O": Color("ff9f43"),
+	"K": Color("a47551"),
+	"N": Color("4a4e69"),
+	"D": Color("3a9d6b"),
+	"S": Color("ff9ecd"),
+	"A": Color("b8c0d6"),
+	"L": Color("f3c995"),
 }
 
 const LEVELS_PER_DIFFICULTY := 10

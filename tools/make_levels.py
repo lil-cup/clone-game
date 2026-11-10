@@ -12,9 +12,9 @@ import sys
 
 # Цвета должны совпадать с Level.COLORS в scripts/level.gd
 PALETTE = {
-    "R": "e8434b", "W": "f4f1ea", "Y": "f2c94c", "G": "4cb860", "B": "4aa3e8",
-    "P": "7b55d9", "O": "f2913d", "K": "8b5a3c", "N": "3a3a4a", "D": "2e7d4f",
-    "S": "f29bb8", "A": "9aa3b5", "L": "e0b483",
+    "R": "ff6b6b", "W": "fdfbf5", "Y": "ffd166", "G": "6bcb77", "B": "5ab8f0",
+    "P": "9b7ede", "O": "ff9f43", "K": "a47551", "N": "4a4e69", "D": "3a9d6b",
+    "S": "ff9ecd", "A": "b8c0d6", "L": "f3c995",
 }
 
 

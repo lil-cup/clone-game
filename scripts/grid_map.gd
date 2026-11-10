@@ -2,6 +2,7 @@ class_name Board
 extends GridMap
 
 const BLOCK_SIZE := Vector3(0.9, 0.6, 0.9)
+const BLOCK_RADIUS := 0.14
 
 var level: Level
 var item_ids := {}
@@ -12,6 +13,8 @@ func build_level(new_level: Level) -> void:
 	clear()
 	mesh_library = make_mesh_library()
 	cell_size = Vector3.ONE
+	# Удаление блока пересобирает меш целого куска поля, поэтому куски делаем маленькими.
+	cell_octant_size = 4
 
 	# Клетка (0, 0) в левом верхнем углу, центр поля в начале координат.
 	var half := level.size / 2.0
@@ -36,11 +39,10 @@ func make_mesh_library() -> MeshLibrary:
 	var lib := MeshLibrary.new()
 	var id := 0
 	for color in Level.COLORS:
-		var mesh := BoxMesh.new()
-		mesh.size = BLOCK_SIZE
+		var mesh := RoundedBox.make(BLOCK_SIZE, BLOCK_RADIUS, 2)
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = Level.COLORS[color]
-		mesh.material = mat
+		mesh.surface_set_material(0, mat)
 		lib.create_item(id)
 		lib.set_item_name(id, color)
 		lib.set_item_mesh(id, mesh)

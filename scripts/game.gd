@@ -2,11 +2,20 @@ extends Node3D
 
 const MAX_ON_BELT := 5
 const SPEED := 14.0          # клеток в секунду
+const ENDGAME_SHOOTERS := 5  # когда стрелков осталось столько или меньше — лента ускоряется
+const ENDGAME_BOOST := 1.8
+const ACCELERATION := 6.0    # насколько быстро лента разгоняется (клеток/с за секунду)
 const SPACING := 2.6         # расстояние между стрелками на ленте
 const MOVE_TIME := 0.3
 const COLUMN_STEP := Vector2(4.6, 3.6)
 const SLOT_STEP := 4.0
 const BIG := 1.5             # стрелки внизу крупнее, чем на ленте
+const BOARD_COLOR := Color("2a2942")
+const SLOT_COLOR := Color("2a2942")
+const HUD_TEXT := Color.WHITE
+const BUTTON_GREEN := Color("4cc46a")
+const BUTTON_ORANGE := Color("ff9f43")
+const BUTTON_PURPLE := Color("7d6fc4")
 
 static var level_index := 0
 
@@ -22,6 +31,10 @@ var belt: Array[Shooter] = []
 var entering := 0
 var last_entry := -100.0
 var finished := false
+var belt_speed := SPEED
+var materials := {}
+var bullet_mesh := SphereMesh.new()
+var piece_mesh: ArrayMesh
 
 var belt_label: Label
 var result_panel: Control
@@ -32,6 +45,11 @@ var result_buttons: VBoxContainer
 
 func _ready() -> void:
 	level = Level.load_map(level_index)
+	bullet_mesh.radius = 0.25
+	bullet_mesh.height = 0.5
+	bullet_mesh.radial_segments = 12
+	bullet_mesh.rings = 6
+	piece_mesh = RoundedBox.make(grid.BLOCK_SIZE, grid.BLOCK_RADIUS, 2)
 	slots.resize(level.settings.slots)
 	grid.build_level(level)
 	conveyor.build(level.size)
@@ -60,6 +78,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if finished:
 		return
+	var target := SPEED * ENDGAME_BOOST if shooters_left() <= ENDGAME_SHOOTERS else SPEED
+	belt_speed = move_toward(belt_speed, target, ACCELERATION * delta)
 	try_enter()
 	for s in belt.duplicate():
 		move_on_belt(s, delta)
@@ -112,11 +132,11 @@ func try_enter() -> void:
 	if pending.is_empty():
 		return
 	var now := Time.get_ticks_msec() / 1000.0
-	if now - last_entry < SPACING / SPEED:
+	if now - last_entry < SPACING / belt_speed:
 		return
 	# Не заезжаем, если кто-то заканчивает круг прямо у въезда.
 	for b in belt:
-		if b.distance > conveyor.length - SPACING - SPEED * MOVE_TIME:
+		if b.distance > conveyor.length - SPACING - belt_speed * MOVE_TIME:
 			return
 
 	var s: Shooter = pending.pop_front()
@@ -140,6 +160,17 @@ func columns_empty() -> bool:
 	return columns.all(func(col): return col.is_empty())
 
 
+# Все стрелки, которые ещё не отстрелялись: в колонках, слотах и на ленте.
+func shooters_left() -> int:
+	var count := on_belt_count()
+	for col in columns:
+		count += col.size()
+	for s in slots:
+		if s:
+			count += 1
+	return count
+
+
 func on_belt_count() -> int:
 	return pending.size() + entering + belt.size()
 
@@ -148,7 +179,7 @@ func on_belt_count() -> int:
 
 func move_on_belt(s: Shooter, delta: float) -> void:
 	# Двигаемся маленькими шагами, чтобы не пропустить полосу при подлагивании.
-	var left := SPEED * delta
+	var left := belt_speed * delta
 	while left > 0.0:
 		var step := minf(left, 0.5)
 		left -= step
@@ -210,10 +241,7 @@ func finish_lap(s: Shooter) -> void:
 func fire_projectile(s: Shooter, cell: Vector2i) -> void:
 	var target: Vector3 = grid.cell_to_world(cell)
 	var bullet := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.25
-	sphere.height = 0.5
-	bullet.mesh = sphere
+	bullet.mesh = bullet_mesh
 	bullet.material_override = color_material(Level.COLORS[s.color].lightened(0.3))
 	add_child(bullet)
 	bullet.position = s.position + Vector3.UP * 0.6
@@ -228,9 +256,7 @@ func fire_projectile(s: Shooter, cell: Vector2i) -> void:
 
 func pop_effect(pos: Vector3, color: Color) -> void:
 	var piece := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = grid.BLOCK_SIZE
-	piece.mesh = box
+	piece.mesh = piece_mesh
 	piece.material_override = color_material(color)
 	piece.position = pos
 	add_child(piece)
@@ -288,7 +314,7 @@ func make_board_visuals() -> void:
 	var box := BoxMesh.new()
 	box.size = Vector3(level.size + 0.4, 0.2, level.size + 0.4)
 	board.mesh = box
-	board.material_override = color_material(Color("2a2942"))
+	board.material_override = color_material(BOARD_COLOR)
 	board.position.y = 0.05
 	add_child(board)
 
@@ -297,15 +323,18 @@ func make_board_visuals() -> void:
 		var plate := BoxMesh.new()
 		plate.size = Vector3(3.6, 0.1, 3.4)
 		slot.mesh = plate
-		slot.material_override = color_material(Color("2a2942"))
+		slot.material_override = color_material(SLOT_COLOR)
 		slot.position = slot_position(i)
 		add_child(slot)
 
 
+# Материалы кэшируются: выстрелов много, и создавать их каждый раз дорого (особенно в браузере).
 func color_material(color: Color) -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	return mat
+	if not materials.has(color):
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = color
+		materials[color] = mat
+	return materials[color]
 
 
 func fit_camera() -> void:
@@ -341,12 +370,16 @@ func make_hud() -> void:
 	header.position.y = 14
 	header.add_theme_constant_override("separation", 0)
 	hud.add_child(header)
-	header.add_child(make_label("Уровень %d" % (level_index + 1), 40))
+	var title := make_label("Уровень %d" % (level_index + 1), 40)
+	title.add_theme_color_override("font_color", HUD_TEXT)
+	header.add_child(title)
 	var info := make_label("%s · сложность %d" % [level.name, level.difficulty + 1], 24)
+	info.add_theme_color_override("font_color", HUD_TEXT)
 	info.modulate = Color(1, 1, 1, 0.7)
 	header.add_child(info)
 
 	belt_label = make_label("", 32)
+	belt_label.add_theme_color_override("font_color", HUD_TEXT)
 	belt_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	belt_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	belt_label.position = Vector2(belt_label.position.x - 24, 26)
@@ -358,12 +391,23 @@ func make_hud() -> void:
 	result_panel.hide()
 	hud.add_child(result_panel)
 
+	# Карточка с текстом и кнопками по центру экрана.
+	var card := PanelContainer.new()
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color("2a2942")
+	card_style.border_color = Color("4b4778")
+	card_style.set_border_width_all(4)
+	card_style.set_corner_radius_all(36)
+	card_style.set_content_margin_all(44)
+	card.add_theme_stylebox_override("panel", card_style)
+	card.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	card.grow_vertical = Control.GROW_DIRECTION_BOTH
+	result_panel.add_child(card)
+
 	var box := VBoxContainer.new()
-	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	box.add_theme_constant_override("separation", 20)
-	result_panel.add_child(box)
+	card.add_child(box)
 
 	result_title = make_label("", 56)
 	box.add_child(result_title)
@@ -382,13 +426,37 @@ func make_label(text: String, font_size: int) -> Label:
 	return label
 
 
-func add_button(text: String, action: Callable) -> void:
+func add_button(text: String, action: Callable, color: Color) -> void:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(360, 80)
-	button.add_theme_font_size_override("font_size", 34)
+	button.custom_minimum_size = Vector2(380, 92)
+	button.add_theme_font_size_override("font_size", 36)
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	button.add_theme_color_override("font_focus_color", Color.WHITE)
+	button.add_theme_color_override("font_shadow_color", color.darkened(0.45))
+	button.add_theme_constant_override("shadow_offset_y", 3)
+	button.add_theme_stylebox_override("normal", button_style(color, false))
+	button.add_theme_stylebox_override("hover", button_style(color.lightened(0.12), false))
+	button.add_theme_stylebox_override("pressed", button_style(color.darkened(0.08), true))
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	button.pressed.connect(action)
 	result_buttons.add_child(button)
+
+
+# Объёмная кнопка: тёмная «подошва» снизу, при нажатии кнопка опускается на неё.
+func button_style(color: Color, pressed: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.border_color = color.darkened(0.35)
+	style.set_corner_radius_all(26)
+	style.border_width_bottom = 3 if pressed else 10
+	style.content_margin_top = 14 if pressed else 8
+	style.content_margin_bottom = 8
+	style.content_margin_left = 32
+	style.content_margin_right = 32
+	return style
 
 
 func show_result(won: bool) -> void:
@@ -399,16 +467,17 @@ func show_result(won: bool) -> void:
 	if not won:
 		result_title.text = "Упс!"
 		result_text.text = "Нет места в слотах"
-		add_button("Заново", restart)
+		add_button("Заново", restart, BUTTON_ORANGE)
 	elif level_index + 1 < Level.count():
 		result_title.text = "Молодец!"
 		result_text.text = "Уровень %d пройден\nКартинка «%s» собрана" % [level_index + 1, level.name]
-		add_button("Дальше", go_to_level.bind(level_index + 1))
+		add_button("Дальше", go_to_level.bind(level_index + 1), BUTTON_GREEN)
 	else:
 		result_title.text = "Поздравляем!"
 		result_text.text = "Все %d уровней пройдены" % Level.count()
-		add_button("Пройти заново", go_to_level.bind(0))
-		add_button("Выйти", get_tree().quit)
+		add_button("Пройти заново", go_to_level.bind(0), BUTTON_GREEN)
+		if not OS.has_feature("web"):  # из браузера игра закрыться не может
+			add_button("Выйти", get_tree().quit, BUTTON_PURPLE)
 
 	result_panel.show()
 	result_panel.modulate.a = 0.0

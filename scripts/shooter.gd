@@ -13,6 +13,12 @@ var slot := -1
 
 var label: Label3D
 
+const NUMBERS_FONT := preload("res://fonts/nunito_numbers.tres")
+
+# Меши общие для всех стрелков: создаются один раз.
+static var body_mesh: ArrayMesh
+static var barrel_mesh: ArrayMesh
+
 
 func setup(new_color: String, new_ammo: int) -> void:
 	color = new_color
@@ -21,18 +27,18 @@ func setup(new_color: String, new_ammo: int) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Level.COLORS[color]
 
+	if body_mesh == null:
+		body_mesh = RoundedBox.make(Vector3(1.9, 1.0, 1.7), 0.35, 3)
+		barrel_mesh = RoundedBox.make(Vector3(0.5, 0.5, 0.6), 0.15, 2)
+
 	var body := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(1.9, 1.0, 1.7)
-	body.mesh = box
+	body.mesh = body_mesh
 	body.material_override = mat
 	body.position.y = 0.6
 	add_child(body)
 
 	var barrel := MeshInstance3D.new()
-	var tube := BoxMesh.new()
-	tube.size = Vector3(0.5, 0.5, 0.6)
-	barrel.mesh = tube
+	barrel.mesh = barrel_mesh
 	barrel.material_override = mat
 	barrel.position = Vector3(0, 0.6, -1.1)
 	add_child(barrel)
@@ -40,8 +46,11 @@ func setup(new_color: String, new_ammo: int) -> void:
 	label = Label3D.new()
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
+	label.font = NUMBERS_FONT
 	label.font_size = 96
-	label.outline_size = 24
+	# Тонкая обводка тёмным оттенком цвета стрелка — мягче, чем чёрная.
+	label.outline_size = 14
+	label.outline_modulate = Level.COLORS[color].darkened(0.55)
 	label.pixel_size = 0.012
 	label.position.y = 1.5
 	add_child(label)

@@ -25,6 +25,10 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
 
+[gui]
+
+theme/custom_font="res://fonts/nunito_ui.tres"
+
 [physics]
 
 3d/physics_engine="Jolt Physics"
