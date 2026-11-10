@@ -1,90 +1,85 @@
+class_name Conveyor
 extends Node3D
 
-@export var straight_scene: PackedScene
-@export var corner_scene: PackedScene
-@export var grid_size := 34
-@export var cell_size := 2.0
-@export var speed := 20.0
-@export var grid: GridMap
-@export var target_block := "Marble"
+# Все размеры в клетках поля (1 клетка = 1 единица).
+@export var road_width := 2.4
+@export var gap := 0.5
+@export var corner_radius := 1.6
+@export var road_color := Color("8a95c4")
+@export var rail_color := Color("d5dbf2")
 
-var last_cell := Vector3i(999, 999, 999)
+var grid_size := 0
+var center := 0.0     # расстояние от центра поля до средней линии ленты
+var straight := 0.0   # длина прямого участка
+var arc := 0.0        # длина скругления
+var length := 0.0     # длина всего круга
 
-func _ready() -> void:
-	build_conveyor()
+
+func build(size: int) -> void:
+	grid_size = size
+	center = size / 2.0 + gap + road_width / 2.0
+	straight = 2.0 * (center - corner_radius)
+	arc = PI / 2.0 * corner_radius
+	length = 4.0 * (straight + arc)
+
+	for child in get_children():
+		child.queue_free()
+	add_strip(0.0, road_width, 0.05, road_color)
+	add_strip(road_width / 2.0, 0.25, 0.1, rail_color)
+	add_strip(-road_width / 2.0, 0.25, 0.1, rail_color)
 
 
-func _process(delta: float) -> void:
-	var follower: PathFollow3D = $Path3D/PathFollow3D
-	follower.progress += speed * delta
-	
-	var pos := follower.global_position
-	var cell := grid.local_to_map(grid.to_local(pos))
-	cell.y = 0
-	
-	if cell == last_cell:
-		return
-		
-	last_cell = cell
-	
-	var dir: Vector3i
-	if abs(pos.x) > abs(pos.z):
-		dir = Vector3i(-int(signf(pos.x)), 0, 0)
+# Позиция на ленте. Путь начинается слева снизу и идёт: низ вправо, право вверх, верх влево, лево вниз.
+func point(d: float) -> Vector3:
+	d = fposmod(d, length)
+	var side := int(d / (straight + arc))
+	var t := d - side * (straight + arc)
+	var p: Vector2
+	if t < straight:
+		p = Vector2(-center + corner_radius + t, center)
 	else:
-		dir = Vector3i(0, 0, -int(signf(pos.z)))
-		
-	shoot(cell, dir)
+		var a := PI / 2.0 - (t - straight) / corner_radius
+		p = Vector2(center - corner_radius, center - corner_radius) + Vector2(cos(a), sin(a)) * corner_radius
+	for i in side:
+		p = Vector2(p.y, -p.x)
+	return Vector3(p.x, 0, p.y)
 
 
-func build_conveyor() -> void:
-	var d := grid_size * cell_size / 2.0 + cell_size / 2.0
-	
-	for i in grid_size:
-		var t := (i - grid_size / 2.0 + 0.5) * cell_size
-		place(straight_scene, t, -d, 0)
-		place(straight_scene, t, d, 0)
-		place(straight_scene, -d, t, 90)
-		place(straight_scene, d, t, 90)
-		
-	place(corner_scene, -d, -d, 90)
-	place(corner_scene, d, -d, 0)
-	place(corner_scene, d, d, -90)
-	place(corner_scene, -d, d, 180)
-	
-	var r := cell_size / 2.0
-	var centers := [
-		Vector2(d - r, -d + r),
-		Vector2(d - r, d - r),
-		Vector2(-d + r, d - r),
-		Vector2(-d + r, -d + r),
-	]
-	
-	var c := Curve3D.new()
-	for k in 4:
-		var start_angle := -90.0 + 90.0 * k
-		for s in 9:
-			var a := deg_to_rad(start_angle + 90.0 * s / 8.0)
-			var p: Vector2 = centers[k] + Vector2(cos(a), sin(a)) * r
-			c.add_point(Vector3(p.x, 0, p.y))
-	c.add_point(c.get_point_position(0))
-	$Path3D.curve = c
+# Направление внутрь поля (куда смотрит стрелок).
+func inward(d: float) -> Vector3:
+	var t := (point(d + 0.05) - point(d - 0.05)).normalized()
+	return Vector3(t.z, 0, -t.x)
 
 
-func place(scene: PackedScene, x: float, z: float, angle: float) -> void:
-	var piece: Node3D = scene.instantiate()
-	piece.position = Vector3(x, 0, z)
-	piece.rotation_degrees.y = angle
-	piece.scale = Vector3.ONE * cell_size
-	add_child(piece)
+# Сторона и полоса напротив точки d, либо (-1, -1) на углах.
+func lane_at(d: float) -> Vector2i:
+	d = fposmod(d, length)
+	var side := int(d / (straight + arc))
+	var t := d - side * (straight + arc)
+	if t >= straight:
+		return Vector2i(-1, -1)
+	var x := -center + corner_radius + t + grid_size / 2.0
+	if x < 0.0 or x >= grid_size:
+		return Vector2i(-1, -1)
+	return Vector2i(side, int(x))
 
 
-func shoot(from: Vector3i, dir: Vector3i) -> void:
-	var cell := from
-	for step in grid_size + 2:
-		cell += dir
-		var item := grid.get_cell_item(cell)
-		if item == GridMap.INVALID_CELL_ITEM:
-			continue
-		if grid.mesh_library.get_item_name(item) == target_block:
-			grid.set_cell_item(cell, GridMap.INVALID_CELL_ITEM)
-		return
+func add_strip(offset: float, width: float, y: float, color: Color) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	st.set_normal(Vector3.UP)
+	var steps := int(length / 0.2)
+	for i in steps + 1:
+		var d := length * i / steps
+		var n := inward(d)
+		var p := point(d) - n * offset
+		st.add_vertex(p + n * width / 2.0 + Vector3.UP * y)
+		st.add_vertex(p - n * width / 2.0 + Vector3.UP * y)
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = mat
+	add_child(mi)
