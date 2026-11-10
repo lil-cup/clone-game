@@ -1,3 +1,4 @@
+class_name Game
 extends Node3D
 
 const MAX_ON_BELT := 5
@@ -13,9 +14,6 @@ const BIG := 1.5             # стрелки внизу крупнее, чем 
 const BOARD_COLOR := Color("2a2942")
 const SLOT_COLOR := Color("2a2942")
 const HUD_TEXT := Color.WHITE
-const BUTTON_GREEN := Color("4cc46a")
-const BUTTON_ORANGE := Color("ff9f43")
-const BUTTON_PURPLE := Color("7d6fc4")
 
 static var level_index := 0
 
@@ -211,7 +209,8 @@ func shoot(s: Shooter, lane: Vector2i) -> bool:
 	fire_projectile(s, cell)
 
 	if level.blocks_left() == 0:
-		get_tree().create_timer(0.8).timeout.connect(show_result.bind(true))
+		# false: таймер стоит, пока игра на паузе.
+		get_tree().create_timer(0.8, false).timeout.connect(show_result.bind(true))
 
 	if s.ammo > 0:
 		return false
@@ -362,6 +361,7 @@ func screen_to_world(screen: Vector2) -> Vector3:
 
 func make_hud() -> void:
 	var hud := CanvasLayer.new()
+	hud.process_mode = Node.PROCESS_MODE_ALWAYS  # кнопки паузы работают, пока игра стоит
 	add_child(hud)
 
 	var header := VBoxContainer.new()
@@ -370,15 +370,17 @@ func make_hud() -> void:
 	header.position.y = 14
 	header.add_theme_constant_override("separation", 0)
 	hud.add_child(header)
-	var title := make_label("Уровень %d" % (level_index + 1), 40)
+	var title := UI.label("Уровень %d" % (level_index + 1), 40)
 	title.add_theme_color_override("font_color", HUD_TEXT)
 	header.add_child(title)
-	var info := make_label("%s · сложность %d" % [level.name, level.difficulty + 1], 24)
+	var info := UI.label("%s · сложность %d" % [level.name, level.difficulty + 1], 24)
 	info.add_theme_color_override("font_color", HUD_TEXT)
 	info.modulate = Color(1, 1, 1, 0.7)
 	header.add_child(info)
 
-	belt_label = make_label("", 32)
+	hud.add_child(make_pause_button())
+
+	belt_label = UI.label("", 32)
 	belt_label.add_theme_color_override("font_color", HUD_TEXT)
 	belt_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	belt_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -391,15 +393,8 @@ func make_hud() -> void:
 	result_panel.hide()
 	hud.add_child(result_panel)
 
-	# Карточка с текстом и кнопками по центру экрана.
-	var card := PanelContainer.new()
-	var card_style := StyleBoxFlat.new()
-	card_style.bg_color = Color("2a2942")
-	card_style.border_color = Color("4b4778")
-	card_style.set_border_width_all(4)
-	card_style.set_corner_radius_all(36)
-	card_style.set_content_margin_all(44)
-	card.add_theme_stylebox_override("panel", card_style)
+	# Карточка с текстом и кнопками по центру экрана (и для итогов, и для паузы).
+	var card := UI.card()
 	card.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	card.grow_vertical = Control.GROW_DIRECTION_BOTH
@@ -409,54 +404,44 @@ func make_hud() -> void:
 	box.add_theme_constant_override("separation", 20)
 	card.add_child(box)
 
-	result_title = make_label("", 56)
+	result_title = UI.label("", 56)
 	box.add_child(result_title)
-	result_text = make_label("", 30)
+	result_text = UI.label("", 30)
 	box.add_child(result_text)
 	result_buttons = VBoxContainer.new()
 	result_buttons.add_theme_constant_override("separation", 14)
 	box.add_child(result_buttons)
 
 
-func make_label(text: String, font_size: int) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.add_theme_font_size_override("font_size", font_size)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	return label
+# Круглая кнопка паузы в левом верхнем углу: две белые полоски.
+func make_pause_button() -> Button:
+	var button := UI.button("", UI.PURPLE, show_pause, Vector2(88, 88), 36, 44)
+	button.position = Vector2(24, 22)
+	for x in [30, 50]:
+		var bar := ColorRect.new()
+		bar.color = Color.WHITE
+		bar.size = Vector2(9, 32)
+		bar.position = Vector2(x - 4.5, 24)
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		button.add_child(bar)
+	return button
 
 
 func add_button(text: String, action: Callable, color: Color) -> void:
-	var button := Button.new()
-	button.text = text
-	button.custom_minimum_size = Vector2(380, 92)
-	button.add_theme_font_size_override("font_size", 36)
-	button.add_theme_color_override("font_color", Color.WHITE)
-	button.add_theme_color_override("font_hover_color", Color.WHITE)
-	button.add_theme_color_override("font_pressed_color", Color.WHITE)
-	button.add_theme_color_override("font_focus_color", Color.WHITE)
-	button.add_theme_color_override("font_shadow_color", color.darkened(0.45))
-	button.add_theme_constant_override("shadow_offset_y", 3)
-	button.add_theme_stylebox_override("normal", button_style(color, false))
-	button.add_theme_stylebox_override("hover", button_style(color.lightened(0.12), false))
-	button.add_theme_stylebox_override("pressed", button_style(color.darkened(0.08), true))
-	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	button.pressed.connect(action)
-	result_buttons.add_child(button)
+	result_buttons.add_child(UI.button(text, color, action))
 
 
-# Объёмная кнопка: тёмная «подошва» снизу, при нажатии кнопка опускается на неё.
-func button_style(color: Color, pressed: bool) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.border_color = color.darkened(0.35)
-	style.set_corner_radius_all(26)
-	style.border_width_bottom = 3 if pressed else 10
-	style.content_margin_top = 14 if pressed else 8
-	style.content_margin_bottom = 8
-	style.content_margin_left = 32
-	style.content_margin_right = 32
-	return style
+# Показывает карточку поверх игры с новым набором кнопок.
+func show_panel(title: String, text: String) -> void:
+	result_title.text = title
+	result_text.text = text
+	result_text.visible = text != ""
+	for b in result_buttons.get_children():
+		b.queue_free()
+	result_panel.show()
+	result_panel.modulate.a = 0.0
+	# Твин привязан к панели: она в HUD, который работает и на паузе.
+	result_panel.create_tween().tween_property(result_panel, "modulate:a", 1.0, 0.3)
 
 
 func show_result(won: bool) -> void:
@@ -465,23 +450,26 @@ func show_result(won: bool) -> void:
 	finished = true
 
 	if not won:
-		result_title.text = "Упс!"
-		result_text.text = "Нет места в слотах"
-		add_button("Заново", restart, BUTTON_ORANGE)
+		show_panel("Упс!", "Нет места в слотах")
+		add_button("Заново", restart, UI.ORANGE)
 	elif level_index + 1 < Level.count():
-		result_title.text = "Молодец!"
-		result_text.text = "Уровень %d пройден\nКартинка «%s» собрана" % [level_index + 1, level.name]
-		add_button("Дальше", go_to_level.bind(level_index + 1), BUTTON_GREEN)
+		Progress.complete(level_index)
+		show_panel("Молодец!", "Уровень %d пройден\nКартинка «%s» собрана" % [level_index + 1, level.name])
+		add_button("Дальше", go_to_level.bind(level_index + 1), UI.GREEN)
 	else:
-		result_title.text = "Поздравляем!"
-		result_text.text = "Все уровни пройдены\nВсего %d %s" % [Level.count(), plural(Level.count(), "уровень", "уровня", "уровней")]
-		add_button("Пройти заново", go_to_level.bind(0), BUTTON_GREEN)
-		if not OS.has_feature("web"):  # из браузера игра закрыться не может
-			add_button("Выйти", get_tree().quit, BUTTON_PURPLE)
+		Progress.complete(level_index)
+		show_panel("Поздравляем!", "Все уровни пройдены\nВсего %d %s" % [Level.count(), plural(Level.count(), "уровень", "уровня", "уровней")])
+	add_button("В меню", go_to_menu, UI.PURPLE)
 
-	result_panel.show()
-	result_panel.modulate.a = 0.0
-	create_tween().tween_property(result_panel, "modulate:a", 1.0, 0.3)
+
+func show_pause() -> void:
+	if finished:
+		return
+	get_tree().paused = true
+	show_panel("Пауза", "")
+	add_button("Продолжить", resume, UI.GREEN)
+	add_button("Заново", restart, UI.ORANGE)
+	add_button("В меню", go_to_menu, UI.PURPLE)
 
 
 # Склонение по числу: 1 уровень, 2 уровня, 5 уровней, 21 уровень.
@@ -499,7 +487,18 @@ func go_to_level(index: int) -> void:
 
 
 func restart() -> void:
+	get_tree().paused = false
 	get_tree().reload_current_scene()
+
+
+func resume() -> void:
+	result_panel.hide()
+	get_tree().paused = false
+
+
+func go_to_menu() -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/menu.tscn")
 
 
 func flash(label: Label) -> void:

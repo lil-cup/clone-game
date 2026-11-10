@@ -15,7 +15,7 @@ var label: Label3D
 
 const NUMBERS_FONT := preload("res://fonts/nunito_numbers.tres")
 
-# Слой стрелков: только он отбрасывает тени (см. shadow_caster_mask у солнца в main.tscn).
+# Слой стрелков: только он отбрасывает тени (см. shadow_caster_mask у солнца в game.tscn).
 const SHADOW_LAYER := 2
 
 # Ствол: где стоит и где его кончик (оттуда вылетают снаряды), в координатах стрелка.

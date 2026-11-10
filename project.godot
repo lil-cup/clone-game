@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="clone-game"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
@@ -35,10 +35,8 @@ theme/custom_font="res://fonts/nunito_ui.tres"
 
 [rendering]
 
-lights_and_shadows/directional_shadow/size=2048
-lights_and_shadows/directional_shadow/size.mobile=2048
-scaling_3d/scale.web=0.75
-
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+lights_and_shadows/directional_shadow/size=2048
+scaling_3d/scale.web=0.75

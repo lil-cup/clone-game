@@ -1,0 +1,49 @@
+[gd_scene format=3 uid="uid://bn3hoi72cqloj"]
+
+[ext_resource type="Script" uid="uid://6eumk34nnh4w" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="Script" uid="uid://c8kugno0p6tao" path="res://scripts/grid_map.gd" id="2_grid"]
+[ext_resource type="Script" uid="uid://bmnp71dfqq564" path="res://scripts/conveyor.gd" id="3_conv"]
+
+[sub_resource type="Environment" id="Env_main"]
+background_mode = 1
+background_color = Color(0.2, 0.196, 0.31, 1)
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 0.15
+
+[sub_resource type="StandardMaterial3D" id="Mat_floor"]
+albedo_color = Color(0.2, 0.196, 0.31, 1)
+
+[node name="Game" type="Node3D" unique_id=1413261229 node_paths=PackedStringArray("grid", "conveyor", "camera")]
+script = ExtResource("1_game")
+grid = NodePath("GridMap")
+conveyor = NodePath("Conveyor")
+camera = NodePath("Camera3D")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=2082685884]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 60, 0)
+projection = 1
+size = 34.0
+far = 200.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1774143706]
+environment = SubResource("Env_main")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=133304248]
+transform = Transform3D(1, 0, 0, 0, 0.5, 0.8660254, 0, -0.8660254, 0.5, 0, 0, 0)
+light_energy = 0.4
+shadow_enabled = true
+shadow_caster_mask = 2
+directional_shadow_mode = 0
+
+[node name="Floor" type="CSGBox3D" parent="." unique_id=639097769]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+material_override = SubResource("Mat_floor")
+size = Vector3(200, 1, 200)
+
+[node name="GridMap" type="GridMap" parent="." unique_id=299908012]
+cell_size = Vector3(1, 1, 1)
+script = ExtResource("2_grid")
+
+[node name="Conveyor" type="Node3D" parent="." unique_id=999680783]
+script = ExtResource("3_conv")
