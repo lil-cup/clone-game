@@ -311,9 +311,15 @@ func color_material(color: Color) -> StandardMaterial3D:
 func fit_camera() -> void:
 	var view := get_viewport().get_visible_rect().size
 	camera.keep_aspect = Camera3D.KEEP_WIDTH
-	camera.size = bottom_edge() * 2.0 + 2.0
-	var visible_height := camera.size * view.y / view.x
+	# Что обязательно должно влезть: поле с лентой по ширине,
+	# а по высоте — заголовок, поле, слоты и пара рядов стрелков.
 	var top := -bottom_edge() - 4.0
+	var bottom := column_position(0, 2).z + 2.0
+	var need_width := bottom_edge() * 2.0 + 2.0
+	var need_height := bottom - top
+	# На широком экране (браузер, компьютер) упираемся в высоту, на телефоне — в ширину.
+	camera.size = maxf(need_width, need_height * view.x / view.y)
+	var visible_height := camera.size * view.y / view.x
 	camera.position = Vector3(0, 60, top + visible_height / 2.0)
 
 
