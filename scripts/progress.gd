@@ -20,3 +20,10 @@ static func complete(index: int) -> void:
 	cfg.load(PATH)
 	cfg.set_value("progress", "completed", index + 1)
 	cfg.save(PATH)
+
+
+static func reset() -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(PATH)
+	cfg.set_value("progress", "completed", 0)
+	cfg.save(PATH)

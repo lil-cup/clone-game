@@ -23,17 +23,20 @@ const LEVELS_PER_DIFFICULTY := 10
 
 const COLUMNS := 4
 
+# Мест для стрелков, вернувшихся с патронами. Одинаково на всех уровнях.
+const SLOTS := 5
+
 # Сложность меняется каждые 10 уровней. Размер поля задаётся в tools/make_levels.py.
 # caps    — сколько патронов может быть у стрелка (меньше = больше стрелков, больше решений)
 # spread  — насколько «неоптимальные» цвета допускаются: 1.0 = всегда лучший цвет, 0.3 = почти любой
 # shuffle — 0: колонки идут строго в порядке решения, 1: стрелки раскиданы по колонкам случайно
 #           (порядок внутри колонки всё равно правильный, поэтому решение всегда есть)
-# slots   — сколько мест для стрелков, вернувшихся с патронами
+# min_ammo — меньше скольких блоков за круг стрелок не делаем (кроме самого конца уровня)
 # target  — какую долю игр должен выигрывать бот, жмущий наугад (подбирается tools/calibrate_levels.gd)
 const DIFFICULTIES := [
-	{"caps": [20, 30, 40], "spread": 1.0, "shuffle": 0.0, "slots": 5, "target": 0.9},
-	{"caps": [10, 20, 30], "spread": 0.3, "shuffle": 1.0, "slots": 3, "target": 0.15},
-	{"caps": [10, 20], "spread": 0.2, "shuffle": 1.0, "slots": 3, "target": 0.08},
+	{"caps": [10, 20], "spread": 0.6, "shuffle": 0.5, "min_ammo": 3, "target": 0.5},
+	{"caps": [10, 20], "spread": 0.3, "shuffle": 1.0, "min_ammo": 4, "target": 0.15},
+	{"caps": [10, 20], "spread": 0.2, "shuffle": 1.0, "min_ammo": 5, "target": 0.08},
 ]
 
 var size := 0
@@ -145,7 +148,8 @@ func generate_shooters(rng: RandomNumberGenerator) -> Array[Dictionary]:
 				best = maxi(best, n)
 
 		# Случайный цвет из тех, что дают хороший выстрел, чтобы уровни были разными.
-		var limit := ceili(best * settings.spread)
+		# Но не слишком мелкий: стрелки с 1–2 патронами только раздражают.
+		var limit := mini(maxi(ceili(best * settings.spread), settings.min_ammo), best)
 		var options: Array = gains.keys().filter(func(c): return gains[c] >= limit)
 		var color: String = options[rng.randi() % options.size()]
 		result.append({"color": color, "ammo": sim.simulate_lap(color, cap)})

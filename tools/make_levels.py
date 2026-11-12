@@ -8,6 +8,7 @@
 """
 import math
 import os
+import random
 import sys
 
 # Цвета должны совпадать с Level.COLORS в scripts/level.gd
@@ -545,19 +546,75 @@ LEVELS = [
 SIZES = [16, 20, 32, 32, 32, 32, 32, 32, 32, 32]
 
 
-def render(layers, n):
-    rows = []
+# Тень (нижний и правый край фигуры) и блик (верхний и левый) для каждого цвета.
+# Свет падает слева сверху. None — тени или блика у цвета нет.
+SHADE = {"R": "K", "W": "A", "Y": "O", "G": "D", "B": "P", "P": "N", "O": "K",
+         "K": "N", "N": None, "D": "N", "S": "R", "A": "N", "L": "O"}
+LIGHT = {"R": "S", "W": None, "Y": "W", "G": "Y", "B": "A", "P": "S", "O": "Y",
+         "K": "L", "N": "P", "D": "G", "S": "W", "A": "W", "L": "W"}
+
+
+def background_details(color, name):
+    """Детали поверх однотонного фона: облака и солнце на небе, звёзды ночью, иначе горошек."""
+    rng = random.Random(name)
+    if color == "B":
+        clouds = []
+        for cx, cy in ((0.2, 0.12), (0.62, 0.2), (0.85, 0.42), (0.14, 0.45), (0.5, 0.62), (0.85, 0.75), (0.15, 0.8)):
+            cx, cy = cx + rng.uniform(-0.05, 0.05), cy + rng.uniform(-0.04, 0.04)
+            clouds += [ellipse(cx, cy, 0.14, 0.06), circle(cx - 0.05, cy - 0.04, 0.06), circle(cx + 0.04, cy - 0.05, 0.065)]
+        return [("Y", circle(0.9, 0.08, 0.1)), ("W", anyof(*clouds))]
+    if color == "N":
+        stars = [star(x, y, 0.045) for x, y in ((rng.random(), rng.random()) for _ in range(22))]
+        moons = [circle(rng.uniform(0.2, 0.8), rng.uniform(0.2, 0.8), 0.07) for _ in range(3)]
+        return [("A", anyof(*moons)), ("Y", anyof(*stars))]
+    light = LIGHT.get(color) or SHADE.get(color)
+    if not light:
+        return []
+    dots = [circle(0.1 + 0.2 * i - 0.1 * (j % 2), 0.08 + 0.17 * j, 0.06) for i in range(6) for j in range(6)]
+    return [(light, anyof(*dots))]
+
+
+def render(layers, n, name=""):
+    layers = layers[:1] + background_details(layers[0][0], name) + layers[1:]
+    grid = [["."] * n for _ in range(n)]
+    owner = [[-1] * n for _ in range(n)]  # какой слой нарисовал клетку
     for r in range(n):
-        line_ = ""
         for c in range(n):
             x, y = (c + 0.5) / n, (r + 0.5) / n
-            color = "."
-            for col, shape in layers:
+            for i, (col, shape) in enumerate(layers):
                 if shape(x, y):
-                    color = col
-            line_ += color
-        rows.append(line_)
-    return rows
+                    grid[r][c] = col
+                    owner[r][c] = i
+    add_volume(grid, owner)
+    return ["".join(row) for row in grid]
+
+
+def add_volume(grid, owner):
+    """Тени и блики по краям фигур. Тонкие детали (глаза, полоски) не трогаем."""
+    n = len(grid)
+    out = [row[:] for row in grid]
+
+    def same(r, c, k):
+        return 0 <= r < n and 0 <= c < n and owner[r][c] == k
+
+    for r in range(n):
+        for c in range(n):
+            k = owner[r][c]
+            if k <= 0:
+                continue  # фон и пустые клетки
+            color = grid[r][c]
+            # Край снизу или справа, а фигура в эту сторону толщиной хотя бы 3 клетки.
+            if (not same(r + 1, c, k) and same(r - 1, c, k) and same(r - 2, c, k)) or \
+               (not same(r, c + 1, k) and same(r, c - 1, k) and same(r, c - 2, k)):
+                if SHADE[color]:
+                    out[r][c] = SHADE[color]
+            elif not same(r - 1, c, k) and same(r + 1, c, k) and same(r + 2, c, k) and \
+                    same(r, c - 1, k) and same(r, c + 1, k) and same(r + 1, c - 1, k):
+                # Блик только на верхнем крае, и только посреди ровного участка.
+                if LIGHT[color] and (r + c) % 3 != 0:
+                    out[r][c] = LIGHT[color]
+    for r in range(n):
+        grid[r][:] = out[r]
 
 
 def main():
@@ -566,7 +623,7 @@ def main():
            "class_name Levels", "", "const LIST := ["]
     rendered = []
     for i, (name, fn) in enumerate(LEVELS):
-        rows = render(fn(), SIZES[i // 10])
+        rows = render(fn(), SIZES[i // 10], name)
         rendered.append((name, rows))
         out.append("\t{")
         out.append('\t\t"name": "%s",' % name)

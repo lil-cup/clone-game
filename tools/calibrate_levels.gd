@@ -66,7 +66,7 @@ func play(source: Level, source_columns: Array, rng: RandomNumberGenerator) -> b
 			s = slots.pop_at(-1 - pick)
 		s.ammo -= level.simulate_lap(s.color, s.ammo)
 		if s.ammo > 0:
-			if slots.size() >= source.settings.slots:
+			if slots.size() >= Level.SLOTS:
 				return false
 			slots.append(s)
 	return true

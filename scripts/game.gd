@@ -33,6 +33,8 @@ var belt_speed := SPEED
 var materials := {}
 var bullet_mesh := SphereMesh.new()
 var piece_mesh: ArrayMesh
+var launch_sound: AudioStreamPlayer
+var pop_sound: AudioStreamPlayer
 
 var belt_label: Label
 var result_panel: Control
@@ -48,11 +50,12 @@ func _ready() -> void:
 	bullet_mesh.radial_segments = 12
 	bullet_mesh.rings = 6
 	piece_mesh = RoundedBox.make(grid.BLOCK_SIZE, grid.BLOCK_RADIUS, 1)
-	slots.resize(level.settings.slots)
+	slots.resize(Level.SLOTS)
 	grid.build_level(level)
 	conveyor.build(level.size)
 	make_board_visuals()
 	make_hud()
+	make_sounds()
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = Level.seed_for(level_index)
@@ -121,8 +124,10 @@ func send_to_belt(s: Shooter) -> void:
 	else:
 		slots[s.slot] = null
 		s.slot = -1
+		compact_slots()
 	s.state = Shooter.State.WAITING
 	pending.append(s)
+	launch_sound.play()
 	layout_pending()
 
 
@@ -250,6 +255,7 @@ func fire_projectile(s: Shooter, cell: Vector2i) -> void:
 	t.tween_callback(func():
 		bullet.queue_free()
 		grid.remove_block(cell)
+		pop_sound.play()
 		pop_effect(target, Level.COLORS[s.color]))
 
 
@@ -273,6 +279,17 @@ func bottom_edge() -> float:
 
 func slot_position(i: int) -> Vector3:
 	return Vector3((i - (slots.size() - 1) / 2.0) * SLOT_STEP, 0, bottom_edge() + 3.0)
+
+
+# Сдвигает стрелков в слотах влево, чтобы свободные места всегда были справа.
+func compact_slots() -> void:
+	var taken := slots.filter(func(s): return s != null)
+	for i in slots.size():
+		var s: Shooter = taken[i] if i < taken.size() else null
+		slots[i] = s
+		if s and s.slot != i:
+			s.slot = i
+			move(s, slot_position(i))
 
 
 func column_position(c: int, tier: int) -> Vector3:
@@ -304,6 +321,29 @@ func move(s: Shooter, to: Vector3) -> Tween:
 
 func rotation_towards(dir: Vector3) -> float:
 	return atan2(-dir.x, -dir.z)
+
+
+# ---------- Звуки ----------
+
+# Звуки синтезирует tools/make_sounds.py.
+func make_sounds() -> void:
+	launch_sound = make_player(load("res://sounds/launch.wav"), 2)
+	launch_sound.volume_db = -10.0
+	# Пузырьки на разных нотах, чтобы очередь выстрелов звучала как мелодия, а не однообразно.
+	var pops := AudioStreamRandomizer.new()
+	for n in 4:
+		pops.add_stream(n, load("res://sounds/pop_%d.wav" % (n + 1)))
+	pops.random_pitch = 1.0
+	pop_sound = make_player(pops, 8)
+	pop_sound.volume_db = -12.0
+
+
+func make_player(stream: AudioStream, polyphony: int) -> AudioStreamPlayer:
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.max_polyphony = polyphony
+	add_child(player)
+	return player
 
 
 # ---------- Оформление ----------
