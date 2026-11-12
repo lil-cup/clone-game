@@ -114,16 +114,6 @@ def yolka():
         ("Y", circle(0.5, 0.09, 0.06)),
     ]
 
-def valenok():
-    return [
-        ("B", everywhere),
-        ("W", rect(0, 0.85, 1, 1)),
-        ("A", anyof(rect(0.3, 0.1, 0.6, 0.8), ellipse(0.55, 0.78, 0.3, 0.12))),
-        ("A", rect(0.3, 0.66, 0.85, 0.85)),
-        ("R", rect(0.27, 0.1, 0.63, 0.2)),
-        ("N", rect(0.25, 0.85, 0.88, 0.9)),
-    ]
-
 def matreshka():
     return [
         ("Y", everywhere),
@@ -165,15 +155,6 @@ def samovar():
         ("O", rect(0.22, 0.47, 0.78, 0.52)),
         ("Y", poly((0.38, 0.7), (0.62, 0.7), (0.7, 0.85), (0.3, 0.85))),
         ("O", rect(0.25, 0.85, 0.75, 0.92)),
-    ]
-
-def balalaika():
-    return [
-        ("P", everywhere),
-        ("K", rect(0.46, 0.04, 0.54, 0.5)),
-        ("O", poly((0.5, 0.42), (0.15, 0.92), (0.85, 0.92))),
-        ("K", circle(0.5, 0.72, 0.06)),
-        ("W", anyof(rect(0.48, 0.06, 0.49, 0.88), rect(0.51, 0.06, 0.52, 0.88))),
     ]
 
 def borovik():
@@ -223,15 +204,6 @@ def ushanka():
         ("K", anyof(line(0.2, 0.86, 0.3, 0.97, 0.035), line(0.8, 0.86, 0.7, 0.97, 0.035))),
     ]
 
-def medved():
-    return [
-        ("G", everywhere),
-        ("K", anyof(circle(0.25, 0.25, 0.12), circle(0.75, 0.25, 0.12), circle(0.5, 0.55, 0.35))),
-        ("L", anyof(circle(0.25, 0.25, 0.06), circle(0.75, 0.25, 0.06), ellipse(0.5, 0.68, 0.16, 0.13))),
-        ("N", anyof(circle(0.38, 0.48, 0.035), circle(0.62, 0.48, 0.035), ellipse(0.5, 0.62, 0.06, 0.04))),
-        ("N", rect(0.49, 0.62, 0.51, 0.72)),
-    ]
-
 def lisa():
     return [
         ("D", everywhere),
@@ -277,18 +249,6 @@ def bashnya():
         ("W", circle(0.5, 0.41, 0.09)),
         ("N", anyof(rect(0.49, 0.35, 0.51, 0.42), rect(0.5, 0.41, 0.56, 0.43))),
         ("N", both(ellipse(0.5, 1, 0.12, 0.2), rect(0, 0.82, 1, 1))),
-    ]
-
-def zharptica():
-    return [
-        ("P", everywhere),
-        ("Y", anyof(line(0.4, 0.55, 0.02, 0.8, 0.09), line(0.42, 0.58, 0.2, 0.98, 0.09))),
-        ("R", anyof(line(0.4, 0.55, 0.06, 0.95, 0.08), line(0.45, 0.6, 0.42, 0.98, 0.08))),
-        ("O", anyof(ellipse(0.55, 0.5, 0.2, 0.13), line(0.62, 0.45, 0.72, 0.28, 0.1), circle(0.73, 0.25, 0.08))),
-        ("R", ellipse(0.5, 0.45, 0.13, 0.07)),
-        ("Y", anyof(line(0.72, 0.18, 0.66, 0.06, 0.04), line(0.75, 0.18, 0.8, 0.06, 0.04))),
-        ("Y", poly((0.8, 0.22), (0.93, 0.26), (0.8, 0.3))),
-        ("N", circle(0.74, 0.23, 0.025)),
     ]
 
 def dome(cx, cy, r):
@@ -405,24 +365,6 @@ def yozhik():
         ("K", rect(0.445, 0.08, 0.46, 0.12)),
     ]
 
-def podsolnuh():
-    petals = [ellipse(0.5 + math.cos(a) * 0.2, 0.36 + math.sin(a) * 0.2, 0.07, 0.07) for a in
-              [i * math.pi / 8 for i in range(16)]]
-    return [
-        ("B", everywhere),
-        ("W", anyof(ellipse(0.15, 0.1, 0.1, 0.04), ellipse(0.85, 0.15, 0.1, 0.035))),
-        ("D", rect(0.47, 0.5, 0.53, 1)),
-        ("G", anyof(poly((0.5, 0.75), (0.15, 0.62), (0.25, 0.75)), poly((0.5, 0.65), (0.85, 0.52), (0.78, 0.66)))),
-        ("D", anyof(line(0.5, 0.74, 0.22, 0.67, 0.02), line(0.5, 0.64, 0.8, 0.57, 0.02))),
-        ("G", rect(0, 0.9, 1, 1)),
-        ("Y", anyof(*petals)),
-        ("O", anyof(*[ellipse(0.5 + math.cos(a) * 0.17, 0.36 + math.sin(a) * 0.17, 0.035, 0.035) for a in
-                      [i * math.pi / 8 + math.pi / 16 for i in range(16)]])),
-        ("K", circle(0.5, 0.36, 0.14)),
-        ("N", anyof(*[circle(0.5 + dx, 0.36 + dy, 0.02) for dx in (-0.08, 0, 0.08) for dy in (-0.08, 0, 0.08)
-                      if dx * dx + dy * dy < 0.01])),
-    ]
-
 def filin():
     return [
         ("N", everywhere),
@@ -504,46 +446,127 @@ def korabl():
                       for i in range(4) for r in range(3)])),
     ]
 
-def salyut():
-    def burst(cx, cy, r, n):
-        return anyof(*[line(cx + math.cos(a) * r * 0.3, cy + math.sin(a) * r * 0.3,
-                            cx + math.cos(a) * r, cy + math.sin(a) * r, 0.03) for a in [i * 2 * math.pi / n for i in range(n)]])
-    towers = anyof(rect(0.05, 0.62, 0.17, 1), rect(0.83, 0.62, 0.95, 1), rect(0.4, 0.5, 0.6, 1),
-                   poly((0.05, 0.62), (0.17, 0.62), (0.11, 0.52)), poly((0.83, 0.62), (0.95, 0.62), (0.89, 0.52)),
-                   poly((0.4, 0.5), (0.6, 0.5), (0.5, 0.32)))
+# ---------- фигуры: каждый пятый уровень ----------
+# Только сам предмет, без фона: пустые клетки поля так и остаются пустыми.
+
+def yabloko():
+    body = anyof(circle(0.37, 0.57, 0.3), circle(0.63, 0.57, 0.3), ellipse(0.5, 0.75, 0.3, 0.17))
     return [
-        ("N", everywhere),
-        ("W", anyof(*[circle(x, y, 0.012) for x, y in [(0.05, 0.05), (0.45, 0.04), (0.95, 0.3), (0.3, 0.45), (0.7, 0.42)]])),
-        ("R", burst(0.2, 0.2, 0.15, 10)), ("Y", circle(0.2, 0.2, 0.035)),
-        ("G", burst(0.78, 0.17, 0.14, 10)), ("W", circle(0.78, 0.17, 0.035)),
-        ("S", burst(0.5, 0.14, 0.1, 8)), ("P", circle(0.5, 0.14, 0.025)),
-        ("O", burst(0.27, 0.48, 0.09, 8)), ("B", burst(0.73, 0.5, 0.09, 8)),
-        ("R", anyof(rect(0, 0.75, 1, 1), towers)),
-        ("W", anyof(*[rect(x, 0.75, x + 0.04, 0.78) for x in [0.02 + i * 0.08 for i in range(13)]])),
-        ("D", anyof(poly((0.05, 0.62), (0.17, 0.62), (0.11, 0.52)), poly((0.83, 0.62), (0.95, 0.62), (0.89, 0.52)),
-                    poly((0.4, 0.5), (0.6, 0.5), (0.5, 0.32)))),
-        ("Y", anyof(star(0.5, 0.29, 0.04), star(0.11, 0.49, 0.03), star(0.89, 0.49, 0.03))),
-        ("W", circle(0.5, 0.6, 0.05)),
-        ("N", anyof(rect(0.495, 0.56, 0.505, 0.61), rect(0.5, 0.6, 0.54, 0.61))),
-        ("Y", anyof(*[rect(x, 0.85, x + 0.03, 0.9) for x in (0.08, 0.13, 0.86, 0.91, 0.47, 0.5)])),
-        ("K", both(ellipse(0.5, 1, 0.06, 0.12), rect(0, 0.88, 1, 1))),
+        ("R", minus(body, ellipse(0.5, 0.27, 0.07, 0.06))),
+        ("Y", both(body, ellipse(0.74, 0.66, 0.2, 0.28))),
+        ("S", ellipse(0.3, 0.45, 0.06, 0.1)),
+        ("K", rect(0.44, 0.08, 0.56, 0.32)),
+        ("G", poly((0.53, 0.2), (0.7, 0.1), (0.85, 0.14), (0.7, 0.26))),
     ]
+
+
+def grusha():
+    body = anyof(circle(0.5, 0.68, 0.27), ellipse(0.5, 0.42, 0.16, 0.24))
+    return [
+        ("Y", body),
+        ("O", both(body, circle(0.62, 0.8, 0.15))),
+        ("W", ellipse(0.38, 0.62, 0.05, 0.09)),
+        ("K", rect(0.44, 0.04, 0.56, 0.22)),
+        ("D", poly((0.53, 0.14), (0.68, 0.04), (0.82, 0.08), (0.67, 0.2))),
+    ]
+
+
+def klubnika():
+    body = anyof(circle(0.36, 0.42, 0.2), circle(0.64, 0.42, 0.2), poly((0.17, 0.46), (0.83, 0.46), (0.5, 0.94)))
+    seeds = [rect(x - 0.03, y - 0.03, x + 0.03, y + 0.03)
+             for x, y in ((0.3, 0.38), (0.5, 0.36), (0.7, 0.38), (0.4, 0.5), (0.6, 0.5), (0.3, 0.58),
+                          (0.5, 0.62), (0.7, 0.58), (0.42, 0.72), (0.58, 0.72), (0.5, 0.83))]
+    # Недозрелая: кончик белый, над ним розовая полоса — чтобы красный не занимал всю ягоду.
+    return [
+        ("R", body),
+        ("S", both(body, rect(0, 0.5, 1, 0.64))),
+        ("W", both(body, rect(0, 0.64, 1, 1))),
+        ("Y", anyof(*seeds)),
+        ("D", anyof(poly((0.25, 0.26), (0.5, 0.18), (0.75, 0.26), (0.62, 0.32), (0.5, 0.27), (0.38, 0.32)),
+                    poly((0.4, 0.24), (0.5, 0.06), (0.6, 0.24)))),
+        ("G", rect(0.47, 0.04, 0.53, 0.16)),
+    ]
+
+
+def arbuz():
+    def half(r):
+        return both(circle(0.5, 0.26, r), rect(0, 0.26, 1, 1))
+    seeds = [ellipse(x, y, 0.025, 0.04) for x, y in ((0.3, 0.35), (0.42, 0.45), (0.58, 0.45), (0.7, 0.35),
+                                                    (0.5, 0.58), (0.36, 0.56), (0.64, 0.56), (0.5, 0.33))]
+    return [
+        ("D", half(0.48)),
+        ("G", half(0.42)),
+        ("W", half(0.38)),
+        ("R", half(0.35)),
+        ("N", anyof(*seeds)),
+    ]
+
+
+def vinograd():
+    rows = [(0.22, [0.3, 0.44, 0.58, 0.72]), (0.36, [0.37, 0.51, 0.65]), (0.5, [0.3, 0.44, 0.58, 0.72]),
+            (0.64, [0.37, 0.51, 0.65]), (0.78, [0.44, 0.58]), (0.9, [0.51])]
+    berries = [circle(x, y + 0.04, 0.075) for y, xs in rows for x in xs]
+    # Ягоды трёх сортов вперемешку, чтобы один цвет не занимал всю гроздь.
+    return [
+        ("P", anyof(*berries[0::3])),
+        ("B", anyof(*berries[1::3])),
+        ("R", anyof(*berries[2::3])),
+        ("S", anyof(*[circle(x - 0.025, y + 0.015, 0.02) for y, xs in rows for x in xs])),
+        ("K", line(0.51, 0.02, 0.51, 0.2, 0.05)),
+        ("G", poly((0.53, 0.1), (0.72, 0.02), (0.92, 0.08), (0.8, 0.2), (0.62, 0.18))),
+    ]
+
+
+def ananas():
+    body = ellipse(0.5, 0.66, 0.24, 0.3)
+    return [
+        ("O", body),
+        # Верх ещё не дозрел — светлее, низ спелый — оранжевый.
+        ("L", both(body, rect(0, 0, 1, 0.6))),
+        ("Y", both(body, lambda x, y: int((x + y) * 14) % 2 == 0 and int((x - y) * 14) % 2 == 0)),
+        ("K", both(body, lambda x, y: abs(((x + y) * 14) % 1 - 0.5) < 0.08 or abs(((x - y) * 14) % 1 - 0.5) < 0.08)),
+        ("D", anyof(poly((0.5, 0.02), (0.56, 0.38), (0.44, 0.38)),
+                    poly((0.3, 0.1), (0.5, 0.38), (0.4, 0.38)),
+                    poly((0.7, 0.1), (0.6, 0.38), (0.5, 0.38)))),
+        ("G", anyof(poly((0.18, 0.2), (0.45, 0.38), (0.35, 0.4)), poly((0.82, 0.2), (0.55, 0.4), (0.65, 0.38)))),
+    ]
+
+
+# Уровни-фигуры: без фона и без деталей на нём.
+FIGURES = {"Яблоко", "Груша", "Клубника", "Арбуз", "Виноград", "Ананас"}
 
 
 # (название, функция) по порядку уровней. Сложность = номер десятка.
 LEVELS = [
     ("Колобок", kolobok), ("Мухомор", muhomor), ("Снеговик", snegovik), ("Ёлка", yolka),
-    ("Валенок", valenok), ("Матрёшка", matreshka), ("Берёза", bereza), ("Избушка", izbushka),
-    ("Самовар", samovar), ("Балалайка", balalaika),
+    ("Яблоко", yabloko), ("Матрёшка", matreshka), ("Берёза", bereza), ("Избушка", izbushka),
+    ("Самовар", samovar), ("Груша", grusha),
     ("Боровик", borovik), ("Рябина", ryabina), ("Снегирь", snegir), ("Ушанка", ushanka),
-    ("Медведь", medved), ("Лиса", lisa), ("Петушок", petushok), ("Ракета", raketa),
-    ("Башня", bashnya), ("Жар-птица", zharptica),
-    ("Собор", sobor), ("Хохлома", hohloma), ("Гжель", gzhel), ("Ёжик", yozhik), ("Подсолнух", podsolnuh),
-    ("Филин", filin), ("Маяк", mayak), ("Тигр", tigr), ("Корабль", korabl), ("Салют", salyut),
+    ("Клубника", klubnika), ("Лиса", lisa), ("Петушок", petushok), ("Ракета", raketa),
+    ("Башня", bashnya), ("Арбуз", arbuz),
+    ("Собор", sobor), ("Хохлома", hohloma), ("Гжель", gzhel), ("Ёжик", yozhik), ("Виноград", vinograd),
+    ("Филин", filin), ("Маяк", mayak), ("Тигр", tigr), ("Корабль", korabl), ("Ананас", ananas),
 ]
 
 # Размер сетки для каждой сложности (по десяткам уровней).
 SIZES = [16, 20, 32, 32, 32, 32, 32, 32, 32, 32]
+# Фигуры не занимают всё поле, поэтому сетка у них крупнее — чтобы блоков было примерно как у соседей.
+FIGURE_SIZES = [22, 30, 40, 40, 40, 40, 40, 40, 40, 40]
+
+
+def fit(layers):
+    """Растягивает фигуру, чтобы она почти касалась краёв поля (с сохранением пропорций)."""
+    steps = 200
+    points = [((c + 0.5) / steps, (r + 0.5) / steps) for r in range(steps) for c in range(steps)]
+    inside = [(x, y) for x, y in points if any(shape(x, y) for _, shape in layers)]
+    x0, x1 = min(x for x, _ in inside), max(x for x, _ in inside)
+    y0, y1 = min(y for _, y in inside), max(y for _, y in inside)
+    side = max(x1 - x0, y1 - y0) * 1.04
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+
+    def remap(shape):
+        return lambda x, y: shape(cx + (x - 0.5) * side, cy + (y - 0.5) * side)
+    return [(color, remap(shape)) for color, shape in layers]
 
 
 # Тень (нижний и правый край фигуры) и блик (верхний и левый) для каждого цвета.
@@ -575,7 +598,9 @@ def background_details(color, name):
 
 
 def render(layers, n, name=""):
-    layers = layers[:1] + background_details(layers[0][0], name) + layers[1:]
+    figure = name in FIGURES
+    if not figure:
+        layers = layers[:1] + background_details(layers[0][0], name) + layers[1:]
     grid = [["."] * n for _ in range(n)]
     owner = [[-1] * n for _ in range(n)]  # какой слой нарисовал клетку
     for r in range(n):
@@ -585,11 +610,11 @@ def render(layers, n, name=""):
                 if shape(x, y):
                     grid[r][c] = col
                     owner[r][c] = i
-    add_volume(grid, owner)
+    add_volume(grid, owner, 0 if figure else 1)
     return ["".join(row) for row in grid]
 
 
-def add_volume(grid, owner):
+def add_volume(grid, owner, first_layer):
     """Тени и блики по краям фигур. Тонкие детали (глаза, полоски) не трогаем."""
     n = len(grid)
     out = [row[:] for row in grid]
@@ -600,7 +625,7 @@ def add_volume(grid, owner):
     for r in range(n):
         for c in range(n):
             k = owner[r][c]
-            if k <= 0:
+            if k < first_layer:
                 continue  # фон и пустые клетки
             color = grid[r][c]
             # Край снизу или справа, а фигура в эту сторону толщиной хотя бы 3 клетки.
@@ -623,10 +648,15 @@ def main():
            "class_name Levels", "", "const LIST := ["]
     rendered = []
     for i, (name, fn) in enumerate(LEVELS):
-        rows = render(fn(), SIZES[i // 10], name)
+        if name in FIGURES:
+            rows = render(fit(fn()), FIGURE_SIZES[i // 10], name)
+        else:
+            rows = render(fn(), SIZES[i // 10], name)
         rendered.append((name, rows))
         out.append("\t{")
         out.append('\t\t"name": "%s",' % name)
+        if name in FIGURES:
+            out.append('\t\t"figure": true,')
         out.append('\t\t"map": [')
         out.extend('\t\t\t"%s",' % r for r in rows)
         out.append("\t\t],")

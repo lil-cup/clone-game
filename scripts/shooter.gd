@@ -12,6 +12,7 @@ var column := -1
 var slot := -1
 
 var label: Label3D
+var visual: Node3D  # всё, что видно; прыгает отдельно от позиции стрелка
 
 const NUMBERS_FONT := preload("res://fonts/nunito_numbers.tres")
 
@@ -38,37 +39,53 @@ func setup(new_color: String, new_ammo: int) -> void:
 		body_mesh = RoundedBox.make(Vector3(1.9, 1.0, 1.7), 0.35, 3)
 		barrel_mesh = RoundedBox.make(Vector3(0.5, 0.5, 0.6), 0.15, 2)
 
+	visual = Node3D.new()
+	add_child(visual)
+
 	var body := MeshInstance3D.new()
 	body.mesh = body_mesh
 	body.layers = SHADOW_LAYER
 	body.material_override = mat
 	body.position.y = 0.6
-	add_child(body)
+	visual.add_child(body)
 
 	var barrel := MeshInstance3D.new()
 	barrel.mesh = barrel_mesh
 	barrel.layers = SHADOW_LAYER
 	barrel.material_override = mat
 	barrel.position = BARREL_POSITION
-	add_child(barrel)
+	visual.add_child(barrel)
 
 	label = Label3D.new()
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
 	label.font = NUMBERS_FONT
-	label.font_size = 96
+	label.font_size = 72
 	# Тонкая обводка тёмным оттенком цвета стрелка — мягче, чем чёрная.
-	label.outline_size = 14
+	label.outline_size = 11
 	label.outline_modulate = Level.COLORS[color].darkened(0.55)
 	label.pixel_size = 0.012
-	label.position.y = 1.5
-	add_child(label)
+	# На верхней грани корпуса: камера наклонена, и метка повыше съезжала бы вверх с блока.
+	label.position.y = 1.1
+	visual.add_child(label)
 	update_label()
 
 
 # Кончик ствола в мировых координатах (учитывает поворот и масштаб стрелка).
 func muzzle_position() -> Vector3:
 	return to_global(MUZZLE)
+
+
+# Прыжок при выборе: присел, подскочил, приземлился с лёгким сплющиванием.
+func hop() -> void:
+	var t := create_tween()
+	t.tween_property(visual, "scale", Vector3(1.15, 0.8, 1.15), 0.06)
+	t.tween_property(visual, "scale", Vector3(0.9, 1.15, 0.9), 0.1)
+	t.parallel().tween_property(visual, "position:y", 1.6, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	t.tween_property(visual, "position:y", 0.0, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(visual, "scale", Vector3.ONE, 0.14)
+	t.tween_property(visual, "scale", Vector3(1.1, 0.88, 1.1), 0.05)
+	t.tween_property(visual, "scale", Vector3.ONE, 0.08)
 
 
 func update_label() -> void:

@@ -11,6 +11,7 @@ const MOVE_TIME := 0.3
 const COLUMN_STEP := Vector2(4.6, 3.6)
 const SLOT_STEP := 4.0
 const BIG := 1.5             # стрелки внизу крупнее, чем на ленте
+const CAMERA_TILT := 62.0    # угол камеры к полу в градусах: 90 — строго сверху, меньше — видны бока блоков
 const BOARD_COLOR := Color("2a2942")
 const SLOT_COLOR := Color("2a2942")
 const HUD_TEXT := Color.WHITE
@@ -37,6 +38,7 @@ var launch_sound: AudioStreamPlayer
 var pop_sound: AudioStreamPlayer
 
 var belt_label: Label
+var belt_badge: Control
 var result_panel: Control
 var result_title: Label
 var result_text: Label
@@ -81,6 +83,7 @@ func _process(delta: float) -> void:
 		return
 	var target := SPEED * ENDGAME_BOOST if shooters_left() <= ENDGAME_SHOOTERS else SPEED
 	belt_speed = move_toward(belt_speed, target, ACCELERATION * delta)
+	conveyor.scroll(belt_speed * delta)
 	try_enter()
 	for s in belt.duplicate():
 		move_on_belt(s, delta)
@@ -115,7 +118,7 @@ func pick(point: Vector3) -> Shooter:
 
 func send_to_belt(s: Shooter) -> void:
 	if on_belt_count() >= MAX_ON_BELT:
-		flash(belt_label)
+		flash(belt_badge)
 		return
 	if s.state == Shooter.State.IN_COLUMN:
 		columns[s.column].erase(s)
@@ -126,6 +129,7 @@ func send_to_belt(s: Shooter) -> void:
 		s.slot = -1
 		compact_slots()
 	s.state = Shooter.State.WAITING
+	s.hop()
 	pending.append(s)
 	launch_sound.play()
 	layout_pending()
@@ -278,7 +282,7 @@ func bottom_edge() -> float:
 
 
 func slot_position(i: int) -> Vector3:
-	return Vector3((i - (slots.size() - 1) / 2.0) * SLOT_STEP, 0, bottom_edge() + 3.0)
+	return Vector3((i - (slots.size() - 1) / 2.0) * SLOT_STEP, 0, bottom_edge() + 4.9)
 
 
 # Сдвигает стрелков в слотах влево, чтобы свободные места всегда были справа.
@@ -293,7 +297,7 @@ func compact_slots() -> void:
 
 
 func column_position(c: int, tier: int) -> Vector3:
-	return Vector3((c - (Level.COLUMNS - 1) / 2.0) * COLUMN_STEP.x, 0, bottom_edge() + 8.0 + tier * COLUMN_STEP.y)
+	return Vector3((c - (Level.COLUMNS - 1) / 2.0) * COLUMN_STEP.x, 0, bottom_edge() + 9.9 + tier * COLUMN_STEP.y)
 
 
 func layout_columns(animated: bool) -> void:
@@ -310,7 +314,7 @@ func layout_columns(animated: bool) -> void:
 # Ожидающие въезда стоят стопкой под точкой въезда.
 func layout_pending() -> void:
 	for i in pending.size():
-		move(pending[i], conveyor.point(0.0) + Vector3(0, 0, 2.6 * (i + 1)))
+		move(pending[i], conveyor.point(0.0) * Vector3(1, 0, 1) + Vector3(0, 0, 2.6 * (i + 1)))
 
 
 func move(s: Shooter, to: Vector3) -> Tween:
@@ -328,14 +332,14 @@ func rotation_towards(dir: Vector3) -> float:
 # Звуки синтезирует tools/make_sounds.py.
 func make_sounds() -> void:
 	launch_sound = make_player(load("res://sounds/launch.wav"), 2)
-	launch_sound.volume_db = -10.0
-	# Пузырьки на разных нотах, чтобы очередь выстрелов звучала как мелодия, а не однообразно.
+	launch_sound.volume_db = -14.0
+	# Несколько вариантов деревянного «тока» и небольшой разброс высоты, чтобы очередь не звучала механически.
 	var pops := AudioStreamRandomizer.new()
 	for n in 4:
 		pops.add_stream(n, load("res://sounds/pop_%d.wav" % (n + 1)))
-	pops.random_pitch = 1.0
+	pops.random_pitch = 1.06
 	pop_sound = make_player(pops, 8)
-	pop_sound.volume_db = -12.0
+	pop_sound.volume_db = -16.0
 
 
 func make_player(stream: AudioStream, polyphony: int) -> AudioStreamPlayer:
@@ -381,14 +385,30 @@ func fit_camera() -> void:
 	camera.keep_aspect = Camera3D.KEEP_WIDTH
 	# Что обязательно должно влезть: поле с лентой по ширине,
 	# а по высоте — заголовок, поле, слоты и пара рядов стрелков.
-	var top := -bottom_edge() - 4.0
+	var top := -bottom_edge() - 8.5
 	var bottom := column_position(0, 2).z + 2.0
 	var need_width := bottom_edge() * 2.0 + 2.0
 	var need_height := bottom - top
 	# На широком экране (браузер, компьютер) упираемся в высоту, на телефоне — в ширину.
-	camera.size = maxf(need_width, need_height * view.x / view.y)
-	var visible_height := camera.size * view.y / view.x
-	camera.position = Vector3(0, 60, top + visible_height / 2.0)
+	# Камера наклонена, поэтому глубина на экране сжимается в sin(угла) раз.
+	var tilt := deg_to_rad(CAMERA_TILT)
+	camera.rotation = Vector3(-tilt, 0, 0)
+	camera.size = maxf(need_width, need_height * sin(tilt) * view.x / view.y)
+	var visible_depth := camera.size * view.y / view.x / sin(tilt)
+	var center := Vector3(0, 0, top + visible_depth / 2.0)
+	camera.position = center + camera.basis.z * 60.0
+	place_belt_badge()
+
+
+# Значок счётчика — над слотами, по центру, в масштабе поля.
+func place_belt_badge() -> void:
+	var a := camera.unproject_position(Vector3(0, 0, bottom_edge() + 1.6))
+	var b := camera.unproject_position(Vector3(1, 0, bottom_edge() + 1.6))
+	var size := Vector2(110, 64)
+	belt_badge.size = size
+	belt_badge.pivot_offset = size / 2.0
+	belt_badge.scale = Vector2.ONE * (b.x - a.x) * 1.9 / size.y
+	belt_badge.position = a - size / 2.0
 
 
 func screen_to_world(screen: Vector2) -> Vector3:
@@ -420,12 +440,21 @@ func make_hud() -> void:
 
 	hud.add_child(make_pause_button())
 
-	belt_label = UI.label("", 32)
-	belt_label.add_theme_color_override("font_color", HUD_TEXT)
-	belt_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	belt_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	belt_label.position = Vector2(belt_label.position.x - 24, 26)
-	hud.add_child(belt_label)
+	# Счётчик стрелков на ленте: белый значок над слотами (место задаёт fit_camera).
+	belt_badge = PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color.WHITE
+	style.border_color = Color("2a2942")
+	style.set_border_width_all(5)
+	style.set_corner_radius_all(40)
+	style.content_margin_left = 22
+	style.content_margin_right = 22
+	belt_badge.add_theme_stylebox_override("panel", style)
+	belt_label = UI.label("", 40)
+	belt_label.add_theme_color_override("font_color", Color("2a2942"))
+	belt_badge.add_child(belt_label)
+	hud.add_child(belt_badge)
+
 
 	result_panel = ColorRect.new()
 	result_panel.color = Color(0, 0, 0, 0.65)
@@ -541,7 +570,7 @@ func go_to_menu() -> void:
 	get_tree().change_scene_to_file("res://scenes/menu.tscn")
 
 
-func flash(label: Label) -> void:
+func flash(label: CanvasItem) -> void:
 	var t := create_tween()
 	label.modulate = Color.RED
 	t.tween_property(label, "modulate", Color.WHITE, 0.4)

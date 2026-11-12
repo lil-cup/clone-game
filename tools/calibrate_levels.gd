@@ -1,7 +1,8 @@
 # Подбирает для каждого уровня раскладку стрелков под нужную сложность.
 # Бот жмёт случайных доступных стрелков; ищем сид, при котором он выигрывает
 # примерно в DIFFICULTIES[...].target доле игр.
-# Запуск: Godot --headless --path . -s tools/calibrate_levels.gd
+# Запуск: Godot --headless --path . -s tools/calibrate_levels.gd [-- 5 10 ...]
+# С номерами уровней пересчитывает только их, остальным оставляет прежние сиды.
 extends SceneTree
 
 const SEEDS_TO_TRY := 40
@@ -9,8 +10,12 @@ const GAMES := 80
 
 
 func _initialize() -> void:
+	var only := Array(OS.get_cmdline_user_args()).map(func(a): return int(a) - 1)
 	var seeds := []
 	for index in Level.count():
+		if not only.is_empty() and not index in only:
+			seeds.append(Level.seed_for(index))
+			continue
 		var level := Level.load_map(index)
 		var best_seed := 0
 		var best_rate := -1.0
