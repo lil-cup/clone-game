@@ -8,7 +8,8 @@ var level: Level
 var item_ids := {}
 
 
-func build_level(new_level: Level) -> void:
+# field — сторона поля в мире: она постоянная, а блоки масштабируются, чтобы влезть в неё.
+func build_level(new_level: Level, field: float) -> void:
 	level = new_level
 	clear()
 	mesh_library = make_mesh_library()
@@ -16,9 +17,9 @@ func build_level(new_level: Level) -> void:
 	# Удаление блока пересобирает меш целого куска поля, поэтому куски делаем маленькими.
 	cell_octant_size = 4
 
+	scale = Vector3.ONE * field / level.size
 	# Клетка (0, 0) в левом верхнем углу, центр поля в начале координат.
-	var half := level.size / 2.0
-	position = Vector3(-half, 0, -half)
+	position = Vector3(-field / 2.0, 0, -field / 2.0)
 
 	for row in level.size:
 		for col in level.size:
@@ -42,6 +43,11 @@ func make_mesh_library() -> MeshLibrary:
 		var mesh := RoundedBox.make(BLOCK_SIZE, BLOCK_RADIUS, 1)
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = Level.COLORS[color]
+		# Лёгкий глянец: блики на скруглённых краях.
+		mat.roughness = 0.3
+		mat.clearcoat_enabled = true
+		mat.clearcoat = 0.7
+		mat.clearcoat_roughness = 0.15
 		mesh.surface_set_material(0, mat)
 		lib.create_item(id)
 		lib.set_item_name(id, color)

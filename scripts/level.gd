@@ -4,19 +4,19 @@ extends RefCounted
 # Цвета блоков и стрелков. Буква в карте уровня -> цвет.
 # Должны совпадать с PALETTE в tools/make_levels.py.
 const COLORS := {
-	"R": Color("ff6b6b"),
-	"W": Color("fdfbf5"),
-	"Y": Color("ffd166"),
-	"G": Color("6bcb77"),
-	"B": Color("5ab8f0"),
-	"P": Color("9b7ede"),
-	"O": Color("ff9f43"),
-	"K": Color("a47551"),
-	"N": Color("4a4e69"),
-	"D": Color("3a9d6b"),
-	"S": Color("ff9ecd"),
-	"A": Color("b8c0d6"),
-	"L": Color("f3c995"),
+	"R": Color("e8202a"),
+	"W": Color("ffffff"),
+	"Y": Color("ffd400"),
+	"G": Color("22b53a"),
+	"B": Color("1f8fff"),
+	"P": Color("7a3cf0"),
+	"O": Color("ff7a00"),
+	"K": Color("7a4520"),
+	"N": Color("1b1b2b"),
+	"D": Color("0f6b2c"),
+	"S": Color("ff6fb5"),
+	"A": Color("9aa3b8"),
+	"L": Color("f7c48a"),
 }
 
 const LEVELS_PER_DIFFICULTY := 10
@@ -34,13 +34,13 @@ const SLOTS := 5
 # min_ammo — меньше скольких блоков за круг стрелок не делаем (кроме самого конца уровня)
 # target  — какую долю игр должен выигрывать бот, жмущий наугад (подбирается tools/calibrate_levels.gd)
 const DIFFICULTIES := [
-	{"caps": [20, 30], "spread": 0.6, "shuffle": 0.5, "min_ammo": 8, "target": 0.5},
-	{"caps": [20, 30, 40], "spread": 0.3, "shuffle": 1.0, "min_ammo": 10, "target": 0.15},
-	{"caps": [20, 30, 40], "spread": 0.2, "shuffle": 1.0, "min_ammo": 10, "target": 0.08},
+	{"caps": [15, 20, 30], "spread": 0.4, "shuffle": 0.8, "min_ammo": 8, "target": 0.25},
+	{"caps": [15, 20, 30], "spread": 0.25, "shuffle": 1.0, "min_ammo": 8, "target": 0.06},
+	{"caps": [12, 20, 25], "spread": 0.15, "shuffle": 1.0, "min_ammo": 8, "target": 0.02},
 ]
 
 # Уровни-фигуры (без фона) мелкие, поэтому патронов у стрелков чуть меньше — иначе слишком просто.
-const FIGURE_CAPS := [15, 25]
+const FIGURE_CAPS := [12, 20]
 const FIGURE_MIN_AMMO := 6
 
 var size := 0

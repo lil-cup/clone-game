@@ -1,7 +1,7 @@
 class_name Conveyor
 extends Node3D
 
-# Все размеры в клетках поля (1 клетка = 1 единица).
+# Все размеры в единицах мира. Поле — квадрат со стороной field, блоки масштабируются под него.
 @export var road_width := 2.4
 @export var gap := 1.1
 # Не больше gap + road_width / 2: иначе крайние ряды пазла окажутся напротив поворота и по ним не выстрелить.
@@ -20,7 +20,8 @@ const CHEVRON_SPEED := 0.5        # ёлочки едут медленнее с�
 
 const ROAD_HEIGHT := 0.2  # стрелки на ленте едут по её верху
 
-var grid_size := 0
+var field := 0.0     # сторона поля
+var cells := 0       # клеток поля по стороне
 var center := 0.0     # расстояние от центра поля до средней линии ленты
 var straight := 0.0   # длина прямого участка
 var arc := 0.0        # длина скругления
@@ -29,9 +30,10 @@ var scroll_offset := 0.0
 var chevrons: Array[MeshInstance3D] = []
 
 
-func build(size: int) -> void:
-	grid_size = size
-	center = size / 2.0 + gap + road_width / 2.0
+func build(field_size: float, cell_count: int) -> void:
+	field = field_size
+	cells = cell_count
+	center = field / 2.0 + gap + road_width / 2.0
 	straight = 2.0 * (center - corner_radius)
 	arc = PI / 2.0 * corner_radius
 	length = 4.0 * (straight + arc)
@@ -138,10 +140,10 @@ func lane_at(d: float) -> Vector2i:
 	var t := d - side * (straight + arc)
 	if t >= straight:
 		return Vector2i(-1, -1)
-	var x := -center + corner_radius + t + grid_size / 2.0
-	if x < 0.0 or x >= grid_size:
+	var x := -center + corner_radius + t + field / 2.0
+	if x < 0.0 or x >= field:
 		return Vector2i(-1, -1)
-	return Vector2i(side, int(x))
+	return Vector2i(side, mini(int(x / field * cells), cells - 1))
 
 
 func plain_material(color: Color) -> StandardMaterial3D:

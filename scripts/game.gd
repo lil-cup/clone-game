@@ -2,7 +2,8 @@ class_name Game
 extends Node3D
 
 const MAX_ON_BELT := 5
-const SPEED := 14.0          # клеток в секунду
+const FIELD := 18.0          # сторона поля в мире — одна на всех уровнях, мельчают только блоки
+const SPEED := 14.0          # единиц мира в секунду
 const ENDGAME_SHOOTERS := 5  # когда стрелков осталось столько или меньше — лента ускоряется
 const ENDGAME_BOOST := 1.8
 const ACCELERATION := 6.0    # насколько быстро лента разгоняется (клеток/с за секунду)
@@ -53,8 +54,8 @@ func _ready() -> void:
 	bullet_mesh.rings = 6
 	piece_mesh = RoundedBox.make(grid.BLOCK_SIZE, grid.BLOCK_RADIUS, 1)
 	slots.resize(Level.SLOTS)
-	grid.build_level(level)
-	conveyor.build(level.size)
+	grid.build_level(level, FIELD)
+	conveyor.build(FIELD, level.size)
 	make_board_visuals()
 	make_hud()
 	make_sounds()
@@ -268,6 +269,7 @@ func pop_effect(pos: Vector3, color: Color) -> void:
 	piece.mesh = piece_mesh
 	piece.material_override = color_material(color)
 	piece.position = pos
+	piece.scale = grid.scale
 	add_child(piece)
 	var t := create_tween().set_parallel()
 	t.tween_property(piece, "scale", Vector3.ZERO, 0.25)
@@ -355,7 +357,7 @@ func make_player(stream: AudioStream, polyphony: int) -> AudioStreamPlayer:
 func make_board_visuals() -> void:
 	var board := MeshInstance3D.new()
 	var box := BoxMesh.new()
-	box.size = Vector3(level.size + 0.4, 0.2, level.size + 0.4)
+	box.size = Vector3(FIELD + 0.4, 0.2, FIELD + 0.4)
 	board.mesh = box
 	board.material_override = color_material(BOARD_COLOR)
 	board.position.y = 0.05

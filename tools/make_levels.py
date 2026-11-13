@@ -13,9 +13,9 @@ import sys
 
 # Цвета должны совпадать с Level.COLORS в scripts/level.gd
 PALETTE = {
-    "R": "ff6b6b", "W": "fdfbf5", "Y": "ffd166", "G": "6bcb77", "B": "5ab8f0",
-    "P": "9b7ede", "O": "ff9f43", "K": "a47551", "N": "4a4e69", "D": "3a9d6b",
-    "S": "ff9ecd", "A": "b8c0d6", "L": "f3c995",
+    "R": "e8202a", "W": "ffffff", "Y": "ffd400", "G": "22b53a", "B": "1f8fff",
+    "P": "7a3cf0", "O": "ff7a00", "K": "7a4520", "N": "1b1b2b", "D": "0f6b2c",
+    "S": "ff6fb5", "A": "9aa3b8", "L": "f7c48a",
 }
 
 
@@ -216,8 +216,9 @@ def lisa():
 
 def petushok():
     return [
-        ("S", everywhere),
-        ("K", rect(0.47, 0.7, 0.53, 1)),
+        ("B", everywhere),
+        ("G", rect(0, 0.84, 1, 1)),
+        ("K", rect(0.47, 0.7, 0.53, 0.9)),
         ("R", anyof(ellipse(0.48, 0.5, 0.25, 0.2), circle(0.68, 0.3, 0.12),
                     poly((0.3, 0.45), (0.1, 0.2), (0.2, 0.5)), poly((0.3, 0.5), (0.05, 0.4), (0.2, 0.62)))),
         ("Y", anyof(circle(0.66, 0.16, 0.05), circle(0.74, 0.17, 0.045), poly((0.79, 0.29), (0.92, 0.33), (0.79, 0.36)))),
@@ -231,6 +232,8 @@ def raketa():
     return [
         ("N", everywhere),
         ("Y", anyof(*[circle(x, y, 0.025) for x, y in stars])),
+        ("S", circle(0.84, 0.24, 0.1)),
+        ("P", ellipse(0.5, 1.02, 0.85, 0.3)),
         ("O", poly((0.4, 0.78), (0.6, 0.78), (0.5, 0.98))),
         ("R", anyof(poly((0.38, 0.55), (0.25, 0.8), (0.38, 0.75)), poly((0.62, 0.55), (0.75, 0.8), (0.62, 0.75)))),
         ("W", anyof(ellipse(0.5, 0.45, 0.13, 0.35))),
@@ -333,8 +336,10 @@ def gzhel():
     """Гжельский чайник: синий узор на белом."""
     body = anyof(ellipse(0.48, 0.6, 0.3, 0.24), rect(0.3, 0.38, 0.66, 0.5))
     return [
-        ("A", everywhere),
-        ("B", anyof(*[circle(0.08 + i * 0.12, 0.04, 0.025) for i in range(8)])),
+        ("B", everywhere),
+        ("A", rect(0, 0.5, 1, 1)),
+        ("W", anyof(*[circle(0.08 + i * 0.12, 0.04, 0.025) for i in range(8)])),
+        ("K", rect(0, 0.76, 1, 1)),
         ("N", rect(0, 0.9, 1, 1)),
         ("W", anyof(body, line(0.74, 0.62, 0.92, 0.36, 0.06), ring(0.17, 0.55, 0.13, 0.05))),
         ("W", anyof(ellipse(0.48, 0.36, 0.2, 0.06), circle(0.48, 0.26, 0.05))),
@@ -463,8 +468,9 @@ def yabloko():
 def grusha():
     body = anyof(circle(0.5, 0.68, 0.27), ellipse(0.5, 0.42, 0.16, 0.24))
     return [
-        ("Y", body),
-        ("O", both(body, circle(0.62, 0.8, 0.15))),
+        ("G", body),
+        ("Y", both(body, circle(0.36, 0.6, 0.2))),
+        ("O", both(body, circle(0.66, 0.8, 0.12))),
         ("W", ellipse(0.38, 0.62, 0.05, 0.09)),
         ("K", rect(0.44, 0.04, 0.56, 0.22)),
         ("D", poly((0.53, 0.14), (0.68, 0.04), (0.82, 0.08), (0.67, 0.2))),
@@ -549,9 +555,9 @@ LEVELS = [
 ]
 
 # Размер сетки для каждой сложности (по десяткам уровней).
-SIZES = [16, 20, 32, 32, 32, 32, 32, 32, 32, 32]
+SIZES = [16, 20, 24, 24, 24, 24, 24, 24, 24, 24]
 # Фигуры не занимают всё поле, поэтому сетка у них крупнее — чтобы блоков было примерно как у соседей.
-FIGURE_SIZES = [22, 30, 40, 40, 40, 40, 40, 40, 40, 40]
+FIGURE_SIZES = [22, 26, 30, 30, 30, 30, 30, 30, 30, 30]
 
 
 def fit(layers):
@@ -573,28 +579,25 @@ def fit(layers):
 # Свет падает слева сверху. None — тени или блика у цвета нет.
 SHADE = {"R": "K", "W": "A", "Y": "O", "G": "D", "B": "P", "P": "N", "O": "K",
          "K": "N", "N": None, "D": "N", "S": "R", "A": "N", "L": "O"}
-LIGHT = {"R": "S", "W": None, "Y": "W", "G": "Y", "B": "A", "P": "S", "O": "Y",
-         "K": "L", "N": "P", "D": "G", "S": "W", "A": "W", "L": "W"}
+# Блик — только более светлый вариант того же оттенка, иначе картинка рябит.
+LIGHT = {"R": "S", "W": None, "Y": "W", "G": None, "B": None, "P": None, "O": "Y",
+         "K": "L", "N": None, "D": "G", "S": "W", "A": "W", "L": "W"}
 
 
 def background_details(color, name):
-    """Детали поверх однотонного фона: облака и солнце на небе, звёзды ночью, иначе горошек."""
+    """Немного деталей на однотонном фоне: облака и солнце на небе, звёзды ночью.
+    Фон должен быть спокойным, чтобы картинка на нём читалась."""
     rng = random.Random(name)
     if color == "B":
         clouds = []
-        for cx, cy in ((0.2, 0.12), (0.62, 0.2), (0.85, 0.42), (0.14, 0.45), (0.5, 0.62), (0.85, 0.75), (0.15, 0.8)):
+        for cx, cy in ((0.2, 0.12), (0.62, 0.16), (0.14, 0.45)):
             cx, cy = cx + rng.uniform(-0.05, 0.05), cy + rng.uniform(-0.04, 0.04)
             clouds += [ellipse(cx, cy, 0.14, 0.06), circle(cx - 0.05, cy - 0.04, 0.06), circle(cx + 0.04, cy - 0.05, 0.065)]
         return [("Y", circle(0.9, 0.08, 0.1)), ("W", anyof(*clouds))]
     if color == "N":
-        stars = [star(x, y, 0.045) for x, y in ((rng.random(), rng.random()) for _ in range(22))]
-        moons = [circle(rng.uniform(0.2, 0.8), rng.uniform(0.2, 0.8), 0.07) for _ in range(3)]
-        return [("A", anyof(*moons)), ("Y", anyof(*stars))]
-    light = LIGHT.get(color) or SHADE.get(color)
-    if not light:
-        return []
-    dots = [circle(0.1 + 0.2 * i - 0.1 * (j % 2), 0.08 + 0.17 * j, 0.06) for i in range(6) for j in range(6)]
-    return [(light, anyof(*dots))]
+        stars = [star(x, y, 0.045) for x, y in ((rng.random(), rng.random()) for _ in range(10))]
+        return [("Y", anyof(*stars))]
+    return []
 
 
 def render(layers, n, name=""):
@@ -636,7 +639,7 @@ def add_volume(grid, owner, first_layer):
             elif not same(r - 1, c, k) and same(r + 1, c, k) and same(r + 2, c, k) and \
                     same(r, c - 1, k) and same(r, c + 1, k) and same(r + 1, c - 1, k):
                 # Блик только на верхнем крае, и только посреди ровного участка.
-                if LIGHT[color] and (r + c) % 3 != 0:
+                if LIGHT[color]:
                     out[r][c] = LIGHT[color]
     for r in range(n):
         grid[r][:] = out[r]
