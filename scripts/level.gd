@@ -26,22 +26,22 @@ const COLUMNS := 4
 # Мест для стрелков, вернувшихся с патронами. Одинаково на всех уровнях.
 const SLOTS := 5
 
+# Меньше стольких патронов у стрелка не бывает. Калибровка отбрасывает раскладки, где это не так,
+# а в картах каждого цвета хотя бы столько блоков (tools/make_levels.py).
+const MIN_AMMO := 10
+
 # Сложность меняется каждые 10 уровней. Размер поля задаётся в tools/make_levels.py.
-# caps    — сколько патронов может быть у стрелка (меньше = больше стрелков, больше решений)
+# caps    — сколько патронов может быть у стрелка (больше = чаще возвращается в слот, сложнее)
 # spread  — насколько «неоптимальные» цвета допускаются: 1.0 = всегда лучший цвет, 0.3 = почти любой
 # shuffle — 0: колонки идут строго в порядке решения, 1: стрелки раскиданы по колонкам случайно
 #           (порядок внутри колонки всё равно правильный, поэтому решение всегда есть)
-# min_ammo — меньше скольких блоков за круг стрелок не делаем (кроме самого конца уровня)
+# min_ammo — меньше скольких патронов стрелков не делаем (см. MIN_AMMO)
 # target  — какую долю игр должен выигрывать бот, жмущий наугад (подбирается tools/calibrate_levels.gd)
 const DIFFICULTIES := [
-	{"caps": [15, 20, 30], "spread": 0.4, "shuffle": 0.8, "min_ammo": 8, "target": 0.25},
-	{"caps": [15, 20, 30], "spread": 0.25, "shuffle": 1.0, "min_ammo": 8, "target": 0.06},
-	{"caps": [12, 20, 25], "spread": 0.15, "shuffle": 1.0, "min_ammo": 8, "target": 0.02},
+	{"caps": [20, 30, 40], "spread": 0.4, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.25},
+	{"caps": [25, 35, 50], "spread": 0.25, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.06},
+	{"caps": [30, 45, 60], "spread": 0.15, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.02},
 ]
-
-# Уровни-фигуры (без фона) мелкие, поэтому патронов у стрелков чуть меньше — иначе слишком просто.
-const FIGURE_CAPS := [12, 20]
-const FIGURE_MIN_AMMO := 6
 
 var size := 0
 var cells: Array[String] = []  # "" = пусто, иначе буква цвета
@@ -68,10 +68,6 @@ static func load_map(index: int) -> Level:
 	level.name = data.name
 	level.difficulty = index / LEVELS_PER_DIFFICULTY
 	level.settings = DIFFICULTIES[mini(level.difficulty, DIFFICULTIES.size() - 1)]
-	if data.get("figure", false):
-		level.settings = level.settings.duplicate()
-		level.settings.caps = FIGURE_CAPS
-		level.settings.min_ammo = FIGURE_MIN_AMMO
 	level.size = map.size()
 	for row in level.size:
 		var line: String = map[row]
@@ -172,9 +168,27 @@ func generate_shooters(rng: RandomNumberGenerator) -> Array[Dictionary]:
 		var limit := mini(maxi(ceili(best * settings.spread), settings.min_ammo), best)
 		var options: Array = gains.keys().filter(func(c): return gains[c] >= limit)
 		var color: String = options[rng.randi() % options.size()]
-		result.append({"color": color, "ammo": sim.simulate_laps(color, cap)})
+		var ammo := tail_safe_ammo(sim, color, gains[color])
+		result.append({"color": color, "ammo": sim.simulate_laps(color, ammo)})
 
 	return merge_small(result)
+
+
+# Сколько патронов дать стрелку, чтобы блоков его цвета на поле не осталось меньше min_ammo:
+# из такого хвоста потом получится только мелкий стрелок. Либо добираем хвост сразу,
+# либо стреляем меньше и оставляем хвост побольше.
+func tail_safe_ammo(sim: Level, color: String, ammo: int) -> int:
+	var min_ammo: int = settings.min_ammo
+	var rest := sim.cells.count(color) - ammo
+	if rest == 0 or rest >= min_ammo:
+		return ammo
+	var test := Level.new()
+	test.size = size
+	test.cells = sim.cells.duplicate()
+	if test.simulate_laps(color, ammo + rest) == ammo + rest:
+		return ammo + rest
+	var less := ammo - (min_ammo - rest)
+	return less if less >= min_ammo else ammo
 
 
 # Сколько стрелков одновременно может ждать в слоте свой остаток (слотов всего SLOTS).
@@ -183,28 +197,48 @@ const MAX_WAITING := 2
 
 # Мелкий стрелок (остаток цвета) отдаёт патроны предыдущему стрелку того же цвета.
 # Тот после своих кругов ждёт в слоте и добирает остаток, когда до него дойдёт очередь.
+# Если предыдущего нет — наоборот, забирает патроны следующего стрелка своего цвета и ждёт его очереди.
 func merge_small(list: Array[Dictionary]) -> Array[Dictionary]:
 	var waiting: Array[Vector2i] = []  # от какого до какого шага решения стрелок ждёт в слоте
-	var i := 0
-	while i < list.size():
-		if list[i].ammo >= settings.min_ammo:
-			i += 1
-			continue
-		var j := i - 1
-		while j >= 0 and list[j].color != list[i].color:
-			j -= 1
-		var busy := waiting.filter(func(w): return w.x < i and w.y > j).size()
-		if j < 0 or busy >= MAX_WAITING:
-			i += 1
-			continue
-		list[j].ammo += list[i].ammo
-		list.remove_at(i)
-		# Номера шагов после i сдвинулись на один.
-		for k in waiting.size():
-			if waiting[k].y > i:
-				waiting[k].y -= 1
-		waiting.append(Vector2i(j, i))
+	# Сначала бережём слоты для игрока, потом разрешаем занять ожидающими все слоты.
+	for limit in [MAX_WAITING, SLOTS]:
+		var i := 0
+		while i < list.size():
+			if list[i].ammo >= settings.min_ammo:
+				i += 1
+				continue
+			var j := i - 1
+			while j >= 0 and list[j].color != list[i].color:
+				j -= 1
+			var k := i + 1
+			while k < list.size() and list[k].color != list[i].color:
+				k += 1
+			var from := -1
+			var to := -1
+			if j >= 0 and busy(waiting, j, i) < limit:
+				from = j
+				to = i
+			elif k < list.size() and busy(waiting, i, k) < limit:
+				from = i
+				to = k
+			if from < 0:
+				i += 1
+				continue
+			list[from].ammo += list[to].ammo
+			list.remove_at(to)
+			# Номера шагов после to сдвинулись на один.
+			for w in waiting.size():
+				if waiting[w].y > to:
+					waiting[w].y -= 1
+			waiting.append(Vector2i(from, to))
+			# Слитый стрелок мог остаться мелким — проверяем его ещё раз.
+			i = from
 	return list
+
+
+# Сколько стрелков ждут в слотах между шагами from и to.
+static func busy(waiting: Array[Vector2i], from: int, to: int) -> int:
+	return waiting.filter(func(w): return w.x < to and w.y > from).size()
 
 
 # Раскладывает стрелков по колонкам. Порядок внутри каждой колонки совпадает с порядком решения,

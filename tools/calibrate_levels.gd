@@ -19,8 +19,15 @@ func _initialize() -> void:
 		var level := Level.load_map(index)
 		var best_seed := 0
 		var best_rate := -1.0
-		for k in SEEDS_TO_TRY:
+		var tried := 0
+		var k := 0
+		# Сиды, где у кого-то меньше Level.MIN_AMMO патронов, не годятся; если таких много — ищем дальше.
+		while tried < SEEDS_TO_TRY and k < SEEDS_TO_TRY * 10:
 			var level_seed := 1000 + index * 100 + k
+			k += 1
+			if not ammo_ok(level, level_seed):
+				continue
+			tried += 1
 			var rate := win_rate(level, level_seed)
 			if best_rate < 0 or absf(rate - level.settings.target) < absf(best_rate - level.settings.target):
 				best_seed = level_seed
@@ -33,6 +40,12 @@ func _initialize() -> void:
 	file.store_string("# Сгенерировано tools/calibrate_levels.gd — не редактируй руками.\n")
 	file.store_string("class_name LevelSeeds\n\nconst SEEDS := %s\n" % str(seeds))
 	quit()
+
+
+func ammo_ok(level: Level, level_seed: int) -> bool:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = level_seed
+	return level.generate_shooters(rng).all(func(s): return s.ammo >= Level.MIN_AMMO)
 
 
 func win_rate(level: Level, level_seed: int) -> float:

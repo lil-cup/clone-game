@@ -555,9 +555,9 @@ LEVELS = [
 ]
 
 # Размер сетки для каждой сложности (по десяткам уровней).
-SIZES = [16, 20, 24, 24, 24, 24, 24, 24, 24, 24]
+SIZES = [18, 20, 24, 24, 24, 24, 24, 24, 24, 24]
 # Фигуры не занимают всё поле, поэтому сетка у них крупнее — чтобы блоков было примерно как у соседей.
-FIGURE_SIZES = [22, 26, 30, 30, 30, 30, 30, 30, 30, 30]
+FIGURE_SIZES = [24, 26, 30, 30, 30, 30, 30, 30, 30, 30]
 
 
 def fit(layers):
@@ -614,6 +614,7 @@ def render(layers, n, name=""):
                     grid[r][c] = col
                     owner[r][c] = i
     add_volume(grid, owner, 0 if figure else 1)
+    merge_rare(grid)
     return ["".join(row) for row in grid]
 
 
@@ -643,6 +644,41 @@ def add_volume(grid, owner, first_layer):
                     out[r][c] = LIGHT[color]
     for r in range(n):
         grid[r][:] = out[r]
+
+
+# Меньше стольких блоков одного цвета на поле не бывает: у стрелка должно быть хотя бы MIN_AMMO
+# патронов (Level.MIN_AMMO в scripts/level.gd), а патронов каждого цвета ровно столько, сколько блоков.
+MIN_BLOCKS = 10
+
+
+def merge_rare(grid):
+    """Редкие цвета (мелкие детали) перекрашивает в самый частый цвет соседних клеток."""
+    n = len(grid)
+    while True:
+        counts = {}
+        for row in grid:
+            for ch in row:
+                if ch != ".":
+                    counts[ch] = counts.get(ch, 0) + 1
+        rare = [ch for ch in counts if counts[ch] < MIN_BLOCKS]
+        if not rare:
+            return
+        color = min(rare, key=lambda ch: counts[ch])
+        cells = [(r, c) for r in range(n) for c in range(n) if grid[r][c] == color]
+        others = [ch for ch in counts if ch != color]
+        fallback = max(others, key=lambda ch: counts[ch])
+        new = {}
+        for r, c in cells:
+            near = {}
+            for dr in (-1, 0, 1):
+                for dc in (-1, 0, 1):
+                    rr, cc = r + dr, c + dc
+                    if 0 <= rr < n and 0 <= cc < n and grid[rr][cc] not in (".", color):
+                        # Соседи по стороне важнее соседей по диагонали.
+                        near[grid[rr][cc]] = near.get(grid[rr][cc], 0) + (2 if dr == 0 or dc == 0 else 1)
+            new[(r, c)] = max(near, key=near.get) if near else fallback
+        for (r, c), ch in new.items():
+            grid[r][c] = ch
 
 
 def main():

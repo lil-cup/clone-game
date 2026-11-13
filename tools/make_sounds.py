@@ -72,6 +72,31 @@ def wood(scale, seed):
     return out
 
 
+def coin():
+    """Монетка падает в копилку: мягкий «плинь» из двух нот подряд (до и соль).
+    Почти чистый синус с тихой октавой сверху, плавное начало и неторопливое затухание —
+    без металлического звона, чтобы десяток монеток подряд не резал слух."""
+    length = 0.45
+    notes = [(0.0, 1046.5, 1.0), (0.07, 1568.0, 0.6)]  # (начало, частота, громкость)
+    out = []
+    for i in range(int(RATE * length)):
+        t = i / RATE
+        v = 0.0
+        for start, f, a in notes:
+            if t < start:
+                continue
+            u = t - start
+            tone = math.sin(2 * math.pi * f * u) + 0.15 * math.sin(2 * math.pi * f * 2 * u) * math.exp(-u * 20)
+            v += a * tone * math.exp(-u * 9) * min(1.0, u / 0.006)
+        out.append(v)
+    # Сглаживание срезает остатки резкости сверху.
+    smooth = 0.0
+    for i, v in enumerate(out):
+        smooth += 0.5 * (v - smooth)
+        out[i] = smooth
+    return out
+
+
 # Чуть разный «размер» деревяшки у вариантов, чтобы очередь не звучала механически.
 POP_SCALES = [0.92, 0.97, 1.02, 1.07]
 
@@ -80,6 +105,7 @@ def main():
     folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sounds")
     os.makedirs(folder, exist_ok=True)
     save(os.path.join(folder, "launch.wav"), launch())
+    save(os.path.join(folder, "coin.wav"), coin())
     for old in os.listdir(folder):
         if old.startswith("pop_"):
             os.remove(os.path.join(folder, old))

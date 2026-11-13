@@ -31,6 +31,7 @@ var belt: Array[Shooter] = []
 var entering := 0
 var last_entry := -100.0
 var finished := false
+var reward_claimed := false
 var belt_speed := SPEED
 var materials := {}
 var bullet_mesh := SphereMesh.new()
@@ -522,15 +523,47 @@ func show_result(won: bool) -> void:
 
 	if not won:
 		show_panel("Упс!", "Нет места в слотах")
-		add_button("Заново", restart, UI.ORANGE)
-	elif level_index + 1 < Level.count():
-		Progress.complete(level_index)
-		show_panel("Молодец!", "Уровень %d пройден\nКартинка «%s» собрана" % [level_index + 1, level.name])
-		add_button("Дальше", go_to_level.bind(level_index + 1), UI.GREEN)
+		add_button("В меню", go_to_menu, UI.PURPLE)
+		return
+	Progress.complete(level_index)
+	if level_index + 1 < Level.count():
+		show_panel("Победа!", "Уровень %d пройден\nКартинка «%s» собрана" % [level_index + 1, level.name])
 	else:
-		Progress.complete(level_index)
 		show_panel("Поздравляем!", "Все уровни пройдены\nВсего %d %s" % [Level.count(), plural(Level.count(), "уровень", "уровня", "уровней")])
-	add_button("В меню", go_to_menu, UI.PURPLE)
+	result_buttons.add_child(make_reward())
+	add_button("Забрать", claim_reward, UI.GREEN)
+
+
+# Награда за уровень: монетка и «+40», выпрыгивают на карточке.
+func make_reward() -> Control:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	row.add_child(CoinIcon.make(84))
+	var amount := UI.label("+%d" % Progress.LEVEL_REWARD, 72)
+	amount.add_theme_color_override("font_color", CoinIcon.LIGHT)
+	amount.add_theme_color_override("font_outline_color", CoinIcon.RIM.darkened(0.4))
+	amount.add_theme_constant_override("outline_size", 14)
+	row.add_child(amount)
+
+	var holder := CenterContainer.new()
+	holder.custom_minimum_size.y = 120
+	holder.add_child(row)
+	holder.resized.connect(func(): row.pivot_offset = row.size / 2.0)
+	row.scale = Vector2.ZERO
+	var t := row.create_tween()
+	t.tween_interval(0.25)
+	t.tween_property(row, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	return holder
+
+
+# Монеты зачисляются, а «капают» в счётчик уже на главном экране.
+func claim_reward() -> void:
+	if reward_claimed:
+		return
+	reward_claimed = true
+	Progress.add_coins(Progress.LEVEL_REWARD)
+	go_to_menu()
 
 
 func show_pause() -> void:
@@ -550,11 +583,6 @@ func plural(n: int, one: String, few: String, many: String) -> String:
 	if n % 10 in [2, 3, 4] and not n % 100 in [12, 13, 14]:
 		return few
 	return many
-
-
-func go_to_level(index: int) -> void:
-	level_index = index
-	restart()
 
 
 func restart() -> void:
