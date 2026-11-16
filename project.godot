@@ -14,6 +14,9 @@ config/name="clone-game"
 run/main_scene="res://scenes/menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
+boot_splash/bg_color=Color(0.2, 0.196, 0.31, 1)
+boot_splash/image="res://splash.png"
+boot_splash/stretch_mode=0
 
 [display]
 
@@ -39,4 +42,5 @@ rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 lights_and_shadows/directional_shadow/size=2048
+anti_aliasing/quality/msaa_3d=1
 scaling_3d/scale.web=0.75
