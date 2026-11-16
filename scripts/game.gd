@@ -38,6 +38,8 @@ var bullet_mesh := SphereMesh.new()
 var piece_mesh: ArrayMesh
 var launch_sound: AudioStreamPlayer
 var pop_sound: AudioStreamPlayer
+var win_sound: AudioStreamPlayer
+var fail_sound: AudioStreamPlayer
 
 var belt_label: Label
 var belt_badge: Control
@@ -336,13 +338,17 @@ func rotation_towards(dir: Vector3) -> float:
 func make_sounds() -> void:
 	launch_sound = make_player(load("res://sounds/launch.wav"), 2)
 	launch_sound.volume_db = -14.0
-	# Несколько вариантов деревянного «тока» и небольшой разброс высоты, чтобы очередь не звучала механически.
+	# Несколько вариантов сухого «тика» и небольшой разброс высоты, чтобы очередь не звучала механически.
 	var pops := AudioStreamRandomizer.new()
 	for n in 4:
 		pops.add_stream(n, load("res://sounds/pop_%d.wav" % (n + 1)))
 	pops.random_pitch = 1.06
 	pop_sound = make_player(pops, 8)
-	pop_sound.volume_db = -16.0
+	pop_sound.volume_db = -12.0
+	win_sound = make_player(load("res://sounds/win.wav"), 1)
+	win_sound.volume_db = -10.0
+	fail_sound = make_player(load("res://sounds/fail.wav"), 1)
+	fail_sound.volume_db = -10.0
 
 
 func make_player(stream: AudioStream, polyphony: int) -> AudioStreamPlayer:
@@ -522,39 +528,15 @@ func show_result(won: bool) -> void:
 	finished = true
 
 	if not won:
-		show_panel("Упс!", "Нет места в слотах")
-		add_button("В меню", go_to_menu, UI.PURPLE)
+		fail_sound.play()
+		result_panel.get_parent().add_child(ResultScreen.fail("Уровень %d" % (level_index + 1), restart, go_to_menu))
 		return
 	Progress.complete(level_index)
-	if level_index + 1 < Level.count():
-		show_panel("Победа!", "Уровень %d пройден\nКартинка «%s» собрана" % [level_index + 1, level.name])
-	else:
-		show_panel("Поздравляем!", "Все уровни пройдены\nВсего %d %s" % [Level.count(), plural(Level.count(), "уровень", "уровня", "уровней")])
-	result_buttons.add_child(make_reward())
-	add_button("Забрать", claim_reward, UI.GREEN)
-
-
-# Награда за уровень: монетка и «+40», выпрыгивают на карточке.
-func make_reward() -> Control:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
-	row.add_child(CoinIcon.make(84))
-	var amount := UI.label("+%d" % Progress.LEVEL_REWARD, 72)
-	amount.add_theme_color_override("font_color", CoinIcon.LIGHT)
-	amount.add_theme_color_override("font_outline_color", CoinIcon.RIM.darkened(0.4))
-	amount.add_theme_constant_override("outline_size", 14)
-	row.add_child(amount)
-
-	var holder := CenterContainer.new()
-	holder.custom_minimum_size.y = 120
-	holder.add_child(row)
-	holder.resized.connect(func(): row.pivot_offset = row.size / 2.0)
-	row.scale = Vector2.ZERO
-	var t := row.create_tween()
-	t.tween_interval(0.25)
-	t.tween_property(row, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	return holder
+	win_sound.play()
+	var all_done := level_index + 1 >= Level.count()
+	var title := "Все уровни" if all_done else "Уровень %d" % (level_index + 1)
+	var subtitle := "пройдены!" if all_done else "пройден!"
+	result_panel.get_parent().add_child(ResultScreen.win(title, subtitle, Progress.LEVEL_REWARD, claim_reward))
 
 
 # Монеты зачисляются, а «капают» в счётчик уже на главном экране.
@@ -574,15 +556,6 @@ func show_pause() -> void:
 	add_button("Продолжить", resume, UI.GREEN)
 	add_button("Заново", restart, UI.ORANGE)
 	add_button("В меню", go_to_menu, UI.PURPLE)
-
-
-# Склонение по числу: 1 уровень, 2 уровня, 5 уровней, 21 уровень.
-func plural(n: int, one: String, few: String, many: String) -> String:
-	if n % 10 == 1 and n % 100 != 11:
-		return one
-	if n % 10 in [2, 3, 4] and not n % 100 in [12, 13, 14]:
-		return few
-	return many
 
 
 func restart() -> void:

@@ -17,6 +17,7 @@ static func make(text: String, fill: Color, diameter: float) -> HexButton:
 	b.color = fill
 	b.custom_minimum_size = Vector2.ONE * diameter
 	b.focus_mode = FOCUS_NONE
+	b.button_down.connect(UI.play_click.bind(b))
 	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
 		b.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	return b

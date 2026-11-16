@@ -20,7 +20,8 @@ const CURRENT_AT := 0.78  # высота текущего уровня (доля
 const DIFFICULTY_NAMES := ["Легко", "Средне", "Сложно"]
 const DIFFICULTY_COLORS := [Color("2f80ff"), Color("ff8a1f"), Color("8b3ff0")]
 const SETTINGS_COLOR := Color("17357a")
-const COIN_DROPS := 10    # на сколько монеток делится награда, пока капает в счётчик
+const COIN_DROPS := 15    # на сколько монеток делится награда, пока летит в счётчик
+const COIN_GAP := 0.085   # пауза между монетками в очереди, секунд
 
 var completed := 0
 var map: Control
@@ -30,6 +31,7 @@ var coins_shown := 0
 var coins_label: Label
 var coins_icon: CoinIcon
 var coin_sound: AudioStreamPlayer
+var coins_burst_sound: AudioStreamPlayer
 var settings_panel: ColorRect
 var settings_buttons: VBoxContainer
 var settings_title: Label
@@ -95,8 +97,12 @@ func _ready() -> void:
 	coin_sound = AudioStreamPlayer.new()
 	coin_sound.stream = load("res://sounds/coin.wav")
 	coin_sound.max_polyphony = 4
-	coin_sound.volume_db = -20.0
+	coin_sound.volume_db = -18.0
 	add_child(coin_sound)
+	coins_burst_sound = AudioStreamPlayer.new()
+	coins_burst_sound.stream = load("res://sounds/coins_burst.wav")
+	coins_burst_sound.volume_db = -16.0
+	add_child(coins_burst_sound)
 
 	await get_tree().process_frame
 	layout_levels()
@@ -269,34 +275,50 @@ func make_coins_counter() -> PanelContainer:
 	return panel
 
 
-# Награда разлетается монетками из текущего уровня, и они по одной со звоном
-# падают в счётчик.
+# Награда высыпается кучкой монеток из текущего уровня, и они по одной,
+# вращаясь и оставляя хвост искорок, улетают столбиком в счётчик.
 func drop_coins(amount: int) -> void:
 	var origin := map.global_position + (point_at(0) if not buttons.is_empty() else map.size / 2.0)
 	var target := coins_icon.global_position + coins_icon.size / 2.0
+	coins_burst_sound.play()
 	for i in COIN_DROPS:
 		# Последняя монетка добирает остаток, чтобы в сумме вышло ровно amount.
 		var value := amount / COIN_DROPS + (amount % COIN_DROPS if i == COIN_DROPS - 1 else 0)
-		var coin := CoinIcon.make(60)
+		var coin := CoinIcon.make(64)
 		add_child(coin)
 		coin.position = origin - coin.size / 2.0
 		coin.scale = Vector2.ZERO
-		var spot := origin + Vector2.from_angle(TAU * i / COIN_DROPS) * randf_range(90, 160) - coin.size / 2.0
+		coin.spin(randf_range(9.0, 13.0))
+		var spot := origin + Vector2(randf_range(-60, 60), randf_range(-50, 30))
+		var sway := randf_range(-70, 70)
 		var t := coin.create_tween()
-		t.tween_property(coin, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		t.parallel().tween_property(coin, "position", spot, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		t.tween_interval(0.25 + i * 0.09)
-		t.tween_property(coin, "position", target - coin.size / 2.0, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		t.parallel().tween_property(coin, "scale", Vector2.ONE * 0.8, 0.45)
-		t.tween_callback(coin_arrived.bind(coin, value, i))
+		t.tween_interval(i * 0.015)
+		t.tween_property(coin, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(coin, "position", spot - coin.size / 2.0, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		t.tween_interval(0.15 + i * (COIN_GAP - 0.015))
+		t.tween_method(fly_coin.bind(coin, spot, target, sway), 0.0, 1.0, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		t.tween_callback(coin_arrived.bind(coin, value))
 
 
-func coin_arrived(coin: CoinIcon, value: int, i: int) -> void:
+# Шаг полёта монетки: прямая к счётчику плюс плавный изгиб вбок, по пути сыплются искорки.
+func fly_coin(k: float, coin: CoinIcon, from: Vector2, to: Vector2, sway: float) -> void:
+	var pos := from.lerp(to, k) + Vector2(sway * sin(k * PI), 0)
+	coin.position = pos - coin.size / 2.0
+	coin.scale = Vector2.ONE * lerpf(1.0, 0.8, k)
+	if randf() < 0.5:
+		var star := Sparkle.spawn(self, pos + Vector2(randf_range(-30, 30), randf_range(0, 40)), randf_range(12, 22))
+		move_child(star, coin.get_index())
+
+
+func coin_arrived(coin: CoinIcon, value: int) -> void:
 	coin.queue_free()
 	coins_shown += value
 	coins_label.text = str(coins_shown)
-	coin_sound.pitch_scale = 1.0 + i * 0.015
+	coin_sound.pitch_scale = randf_range(0.97, 1.03)
 	coin_sound.play()
+	var target := coins_icon.global_position + coins_icon.size / 2.0
+	for n in 2:
+		Sparkle.spawn(self, target + Vector2.from_angle(randf() * TAU) * randf_range(25, 45), randf_range(14, 20))
 	var t := coins_icon.create_tween()
 	t.tween_property(coins_icon, "scale", Vector2.ONE * 1.25, 0.06)
 	t.tween_property(coins_icon, "scale", Vector2.ONE, 0.12)
