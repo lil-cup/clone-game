@@ -45,7 +45,7 @@ static func button(text: String, color: Color, action: Callable, min_size := Vec
 static func play_click(from: Node) -> void:
 	if not is_instance_valid(click_player):
 		click_player = AudioStreamPlayer.new()
-		click_player.stream = load("res://sounds/click.wav")
+		click_player.stream = load("res://sounds/button_press.wav")
 		click_player.volume_db = -8.0
 		click_player.max_polyphony = 3
 		click_player.process_mode = Node.PROCESS_MODE_ALWAYS
