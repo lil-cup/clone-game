@@ -13,10 +13,10 @@ config_version=5
 config/name="clone-game"
 run/main_scene="res://scenes/menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
-config/icon="res://icon.svg"
 boot_splash/bg_color=Color(0.2, 0.196, 0.31, 1)
-boot_splash/image="res://splash.png"
 boot_splash/stretch_mode=0
+boot_splash/image="res://splash.png"
+config/icon="res://icon.svg"
 
 [display]
 
