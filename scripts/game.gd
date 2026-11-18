@@ -85,7 +85,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if finished:
 		return
-	var target := SPEED * ENDGAME_BOOST if shooters_left() <= ENDGAME_SHOOTERS else SPEED
+	var target := SPEED * ENDGAME_BOOST if endgame() else SPEED
 	belt_speed = move_toward(belt_speed, target, ACCELERATION * delta)
 	conveyor.scroll(belt_speed * delta)
 	try_enter()
@@ -183,6 +183,11 @@ func shooters_left() -> int:
 	return count
 
 
+# Последние стрелки: считаются все — и в колонках, и в слотах после круга, и на ленте.
+func endgame() -> bool:
+	return shooters_left() <= ENDGAME_SHOOTERS
+
+
 func on_belt_count() -> int:
 	return pending.size() + entering + belt.size()
 
@@ -197,8 +202,8 @@ func move_on_belt(s: Shooter, delta: float) -> void:
 		left -= step
 		s.distance += step
 		if s.distance >= conveyor.length:
-			if columns_empty():
-				s.distance -= conveyor.length  # брать больше некого — едет ещё круг
+			if columns_empty() or endgame():
+				s.distance -= conveyor.length  # последние стрелки — едет ещё круг, а не в слот
 			else:
 				finish_lap(s)
 				return

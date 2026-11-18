@@ -30,6 +30,8 @@ var badge: PanelContainer
 var coins_shown := 0
 var coins_label: Label
 var coins_icon: CoinIcon
+var sparkles: Control     # слой искорок под летящими монетками
+var sparkle_wait := 0.0
 var coin_sound: AudioStreamPlayer
 var coins_burst_sound: AudioStreamPlayer
 var settings_panel: ColorRect
@@ -72,9 +74,11 @@ func _ready() -> void:
 			var b := make_level_button(i)
 			map.add_child(b)
 			buttons.append(b)
+		# На лёгких уровнях плашку не показываем — подписываем только «Средне» и «Сложно».
 		var difficulty := difficulty_of(completed)
-		badge = make_badge(DIFFICULTY_NAMES[difficulty], DIFFICULTY_COLORS[difficulty])
-		map.add_child(badge)
+		if difficulty > 0:
+			badge = make_badge(DIFFICULTY_NAMES[difficulty], DIFFICULTY_COLORS[difficulty])
+			map.add_child(badge)
 
 		var play := UI.button("Играть", PLAY, start.bind(completed), Vector2(400, 124), 64, 34)
 		play.add_theme_color_override("font_outline_color", PLAY.darkened(0.6))
@@ -92,6 +96,10 @@ func _ready() -> void:
 		map.add_child(done)
 
 	add_child(make_coins_counter())
+	sparkles = Control.new()
+	sparkles.set_anchors_preset(PRESET_FULL_RECT)
+	sparkles.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(sparkles)
 	add_child(make_settings_button())
 	make_settings_panel()
 	coin_sound = AudioStreamPlayer.new()
@@ -189,8 +197,8 @@ func layout_levels() -> void:
 		var b := buttons[0]
 		b.set_meta("pulse", true)
 		var t := b.create_tween().set_loops()
-		t.tween_property(b, "scale", Vector2.ONE * 1.06, 0.6).set_trans(Tween.TRANS_SINE)
-		t.tween_property(b, "scale", Vector2.ONE, 0.6).set_trans(Tween.TRANS_SINE)
+		t.tween_property(b, "grow", 1.06, 0.6).set_trans(Tween.TRANS_SINE)
+		t.tween_property(b, "grow", 1.0, 0.6).set_trans(Tween.TRANS_SINE)
 
 
 func draw_path() -> void:
@@ -305,9 +313,12 @@ func fly_coin(k: float, coin: CoinIcon, from: Vector2, to: Vector2, sway: float)
 	var pos := from.lerp(to, k) + Vector2(sway * sin(k * PI), 0)
 	coin.position = pos - coin.size / 2.0
 	coin.scale = Vector2.ONE * lerpf(1.0, 0.8, k)
-	if randf() < 0.5:
-		var star := Sparkle.spawn(self, pos + Vector2(randf_range(-30, 30), randf_range(0, 40)), randf_range(12, 22))
-		move_child(star, coin.get_index())
+	# Искорки сыплются не каждый кадр, а с общим ограничением на все монетки сразу,
+	# иначе на быстром экране их набираются сотни и анимация подтормаживает.
+	var now := Time.get_ticks_msec() / 1000.0
+	if now >= sparkle_wait:
+		sparkle_wait = now + 0.02
+		Sparkle.spawn(sparkles, pos + Vector2(randf_range(-30, 30), randf_range(0, 40)), randf_range(12, 22))
 
 
 func coin_arrived(coin: CoinIcon, value: int) -> void:

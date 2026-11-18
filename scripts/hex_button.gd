@@ -9,6 +9,12 @@ const DEPTH := 0.09  # высота подошвы, доля размера
 
 var color := Color.WHITE
 var number := ""
+# Увеличение при «дыхании». Рисуем его сами в _draw, а не через scale узла:
+# позиция контрола привязана к целым пикселям, и при scale кнопка дёргалась по пикселю.
+var grow := 1.0:
+	set(value):
+		grow = value
+		queue_redraw()
 
 
 static func make(text: String, fill: Color, diameter: float) -> HexButton:
@@ -24,6 +30,7 @@ static func make(text: String, fill: Color, diameter: float) -> HexButton:
 
 
 func _draw() -> void:
+	draw_set_transform(size / 2.0 * (1.0 - grow), 0.0, Vector2.ONE * grow)
 	var r := minf(size.x, size.y) / 2.0
 	var depth := r * 2.0 * DEPTH
 	var c := size / 2.0 - Vector2(0, depth / 2.0)
@@ -31,10 +38,10 @@ func _draw() -> void:
 		c.y += depth * 0.6
 	var fill := color.lightened(0.1) if is_hovered() and not disabled else color
 
-	draw_colored_polygon(hexagon(c + Vector2(0, depth), r * 0.94), color.darkened(0.5))
-	draw_colored_polygon(hexagon(c, r * 0.94), color.darkened(0.35))
-	draw_colored_polygon(hexagon(c, r * 0.82), fill.lightened(0.35))
-	draw_colored_polygon(hexagon(c + Vector2(0, r * 0.05), r * 0.78), fill)
+	draw_hexagon(hexagon(c + Vector2(0, depth), r * 0.94), color.darkened(0.5))
+	draw_hexagon(hexagon(c, r * 0.94), color.darkened(0.35))
+	draw_hexagon(hexagon(c, r * 0.82), fill.lightened(0.35))
+	draw_hexagon(hexagon(c + Vector2(0, r * 0.05), r * 0.78), fill)
 	# Блик вдоль верхней левой грани (от левого верхнего угла к верхнему).
 	var shine := hexagon(c, r * 0.68)
 	draw_line(shine[22], shine[1], Color(1, 1, 1, 0.55), r * 0.07, true)
@@ -45,6 +52,14 @@ func _draw() -> void:
 	draw_string_outline(NUMBER_FONT, base, number, HORIZONTAL_ALIGNMENT_CENTER, width, font_size,
 			int(r * 0.16), color.darkened(0.6))
 	draw_string(NUMBER_FONT, base, number, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, Color.WHITE)
+
+
+# Заливка без сглаживания даёт «лесенку» по краям, поэтому обводим её тонкой сглаженной линией.
+func draw_hexagon(points: PackedVector2Array, fill: Color) -> void:
+	draw_colored_polygon(points, fill)
+	var outline := points.duplicate()
+	outline.append(points[0])
+	draw_polyline(outline, fill, 1.5, true)
 
 
 # Шестиугольник остриём вверх со скруглёнными углами.
