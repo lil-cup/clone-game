@@ -40,6 +40,8 @@ var link_sphere: SphereMesh
 var links: Array[Dictionary] = []  # {a, b, tube} — связанные пары в колонках
 var materials := {}
 var bullet_mesh := SphereMesh.new()
+var bullet_pool: Array[MeshInstance3D] = []
+var piece_pool: Array[MeshInstance3D] = []
 var piece_mesh: ArrayMesh
 var launch_sound: AudioStreamPlayer
 var pop_sound: AudioStreamPlayer
@@ -377,32 +379,49 @@ func finish_lap(s: Shooter) -> void:
 
 func fire_projectile(s: Shooter, cell: Vector2i) -> void:
 	var target: Vector3 = grid.cell_to_world(cell)
-	var bullet := MeshInstance3D.new()
-	bullet.mesh = bullet_mesh
+	var bullet := take_from(bullet_pool, bullet_mesh)
 	bullet.material_override = color_material(Level.COLORS[s.color].lightened(0.3))
-	add_child(bullet)
 	bullet.position = s.muzzle_position()
+	bullet.scale = Vector3.ONE
 
+	var color: Color = Level.COLORS[s.color]
 	var t := create_tween()
 	t.tween_property(bullet, "position", target, 0.12)
 	t.tween_callback(func():
-		bullet.queue_free()
+		give_back(bullet_pool, bullet)
 		grid.remove_block(cell)
 		pop_sound.play()
-		pop_effect(target, Level.COLORS[s.color]))
+		pop_effect(target, color))
 
 
 func pop_effect(pos: Vector3, color: Color) -> void:
-	var piece := MeshInstance3D.new()
-	piece.mesh = piece_mesh
+	var piece := take_from(piece_pool, piece_mesh)
 	piece.material_override = color_material(color)
 	piece.position = pos
 	piece.scale = grid.scale
-	add_child(piece)
 	var t := create_tween().set_parallel()
 	t.tween_property(piece, "scale", Vector3.ZERO, 0.25)
 	t.tween_property(piece, "position:y", pos.y + 1.5, 0.25)
-	t.chain().tween_callback(piece.queue_free)
+	t.chain().tween_callback(give_back.bind(piece_pool, piece))
+
+
+# Снаряды и кусочки сбитых блоков берутся из запаса и возвращаются в него, а не создаются
+# на каждый выстрел: в браузере на телефоне создание узлов дорогое, и при частой стрельбе
+# движение пушек подлагивало.
+func take_from(pool: Array[MeshInstance3D], mesh: Mesh) -> MeshInstance3D:
+	var node: MeshInstance3D = pool.pop_back() if not pool.is_empty() else null
+	if not node:
+		node = MeshInstance3D.new()
+		node.mesh = mesh
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(node)
+	node.visible = true
+	return node
+
+
+func give_back(pool: Array[MeshInstance3D], node: MeshInstance3D) -> void:
+	node.visible = false
+	pool.append(node)
 
 
 # ---------- Связанные стрелки ----------
@@ -680,6 +699,19 @@ func make_hud() -> void:
 	var title := UI.label("Уровень %d" % (level_index + 1), 40)
 	title.add_theme_color_override("font_color", HUD_TEXT)
 	header.add_child(title)
+	# Тройное нажатие на заголовок показывает счётчик кадров — проверять плавность на телефоне.
+	var meter := FpsMeter.make()
+	hud.add_child(meter)
+	var taps: Array[float] = []
+	title.mouse_filter = Control.MOUSE_FILTER_STOP
+	title.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed:
+			var now := Time.get_ticks_msec() / 1000.0
+			taps.append(now)
+			taps = taps.filter(func(t): return now - t < 1.0)
+			if taps.size() >= 3:
+				taps.clear()
+				meter.visible = not meter.visible)
 	var info := UI.label("%s · сложность %d" % [level.name, level.difficulty + 1], 24)
 	info.add_theme_color_override("font_color", HUD_TEXT)
 	info.modulate = Color(1, 1, 1, 0.7)
