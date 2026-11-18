@@ -20,7 +20,7 @@ var on_cancel: Callable  # если задан — в шапке крестик
 var content: Control
 var stage: Control
 var rays: Control
-var icon: Control
+var icon: Node2D  # Node2D, а не Control: контролы стоят на целых пикселях, и покачивание дёргалось
 var button: Button
 var sparkle_wait := 0.3
 
@@ -31,7 +31,7 @@ static func booster_gift(id: String, claimed: Callable) -> CardScreen:
 	screen.title_text = "Новый бустер"
 	screen.caption_text = BoosterBar.caption(id)
 	screen.button_text = "Забрать!"
-	screen.painter = func(c: Control): BoosterBar.draw_icon(id, c, Vector2.ZERO, 92.0)
+	screen.painter = func(c: CanvasItem): BoosterBar.draw_icon(id, c, Vector2.ZERO, 92.0)
 	screen.on_ok = claimed
 	screen.build()
 	return screen
@@ -102,7 +102,7 @@ func build() -> void:
 	rays = Control.new()
 	rays.draw.connect(func(): draw_rays(rays))
 	stage.add_child(rays)
-	icon = Control.new()
+	icon = Node2D.new()
 	icon.draw.connect(func(): painter.call(icon))
 	stage.add_child(icon)
 	stage.resized.connect(func():
@@ -232,7 +232,7 @@ func draw_rays(c: Control) -> void:
 
 
 # Сердце с трещиной сверху вниз и «-1» сбоку.
-static func draw_broken_heart(c: Control) -> void:
+static func draw_broken_heart(c: CanvasItem) -> void:
 	UI.draw_heart(c, Vector2.ZERO, 210.0, true)
 
 	var font: Font = UI.number_font()

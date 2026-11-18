@@ -111,6 +111,13 @@ static func play_click(from: Node) -> void:
 		click_player.process_mode = Node.PROCESS_MODE_ALWAYS
 		from.get_tree().root.add_child(click_player)
 	click_player.play()
+	vibrate(12)
+
+
+# Короткая вибрация телефона. В браузере работает на Android; на iPhone и компьютере
+# браузер вибрацию не поддерживает, и вызов просто ничего не делает.
+static func vibrate(ms: int) -> void:
+	Input.vibrate_handheld(ms)
 
 
 # Объёмная кнопка: тёмная «подошва» снизу, при нажатии кнопка опускается на неё.

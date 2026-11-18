@@ -156,7 +156,7 @@ func start() -> void:
 	basics = true
 	var first := game.first_in_columns()
 	if first:
-		say("Нажми на стрелка — он поедет\nи собьёт блоки своего цвета")
+		say("Нажми на пушку — она поедет\nи собьёт блоки своего цвета")
 		point_at(first)
 
 
@@ -176,7 +176,7 @@ func belt_full() -> void:
 		return
 	belt_full_shown = true
 	stop_pointing()
-	say("На ленте одновременно\nмогут ехать 5 стрелков")
+	say("На ленте одновременно\nмогут ехать 5 пушек")
 	pause_until_tap()
 
 
@@ -185,7 +185,7 @@ func landed_in_slot(s: Shooter) -> void:
 	if not basics or slot_shown or waiting_tap:
 		return
 	slot_shown = true
-	say("У стрелка остались заряды.\nНажми, чтобы отправить его снова!")
+	say("У пушки остались заряды.\nНажми, чтобы отправить её снова!")
 	point_at(s)
 
 
@@ -222,7 +222,7 @@ func booster_used(id: String) -> void:
 			say("Стрелки перемешаны!")
 			get_tree().create_timer(2.0, false).timeout.connect(hush)
 		_:
-			say("Нажми на любого стрелка в очереди —\nон сразу поедет на ленту")
+			say("Нажми на любую пушку в очереди —\nона сразу поедет на ленту")
 
 
 # Стрелка выбрали бустером — подсказка больше не нужна.

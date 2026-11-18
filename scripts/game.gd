@@ -105,11 +105,11 @@ func _ready() -> void:
 	# Уровень, где впервые появляются скрытые стрелки: сначала объясняем, игра ждёт.
 	if level_index == HIDDEN_FROM and Progress.completed() <= HIDDEN_FROM:
 		get_tree().paused = true
-		hud.add_child(NoveltyScreen.make("Этот стрелок скрывает свой цвет!\nОн откроется, когда выйдет вперёд",
+		hud.add_child(NoveltyScreen.make("Эта пушка скрывает свой цвет!\nОна откроется, когда выйдет вперёд",
 				NoveltyScreen.HIDDEN, func(): get_tree().paused = false))
 	if level_index == Level.LINKS_FROM and Progress.completed() <= Level.LINKS_FROM:
 		get_tree().paused = true
-		hud.add_child(NoveltyScreen.make("Связанные стрелки едут на ленту вместе!\nОба должны стоять впереди",
+		hud.add_child(NoveltyScreen.make("Связанные пушки едут на ленту вместе!\nОбе должны стоять впереди",
 				NoveltyScreen.LINKED, func(): get_tree().paused = false))
 	# Новый бустер дарим один раз, а потом показываем, как им пользоваться (игра ждёт).
 	var gift := booster_bar.next_gift() if booster_bar else ""
@@ -753,11 +753,13 @@ func show_result(won: bool) -> void:
 
 	if not won:
 		fail_sound.play()
+		UI.vibrate(250)
 		Progress.lose_life(level_index)
 		result_panel.get_parent().add_child(ResultScreen.fail("Уровень %d" % (level_index + 1), retry, go_to_menu))
 		return
 	Progress.complete(level_index)
 	win_sound.play()
+	UI.vibrate(120)
 	var all_done := level_index + 1 >= Level.count()
 	var title := "Все уровни" if all_done else "Уровень %d" % (level_index + 1)
 	var subtitle := "пройдены!" if all_done else "пройден!"

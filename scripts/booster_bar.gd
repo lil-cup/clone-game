@@ -49,8 +49,8 @@ static func caption(id: String) -> String:
 		"slot":
 			return "+1 место на ленте"
 		"pick":
-			return "Выбери любого стрелка\nв очереди"
-	return "Перемешивает стрелков\nв колонках"
+			return "Выбери любую пушку\nв очереди"
+	return "Перемешивает пушки\nв колонках"
 
 
 static func hint(id: String) -> String:
@@ -58,8 +58,8 @@ static func hint(id: String) -> String:
 		"slot":
 			return "Используй бустер, чтобы добавить\nодно место на ленту!"
 		"pick":
-			return "Используй бустер, чтобы выбрать\nлюбого стрелка в очереди!"
-	return "Используй бустер, чтобы перемешать\nстрелков в колонках!"
+			return "Используй бустер, чтобы выбрать\nлюбую пушку в очереди!"
+	return "Используй бустер, чтобы перемешать\nпушки в колонках!"
 
 
 static func draw_icon(id: String, c: CanvasItem, center: Vector2, r: float) -> void:
@@ -90,9 +90,9 @@ func build() -> void:
 
 func make_booster(id: String) -> Button:
 	var b := UI.button("", COLOR, use.bind(id), SIZE, 36, 30)
-	var icon := Control.new()
+	# Значок — Node2D: он «дышит», пока бустер ждёт цель, а контролы при этом дёргаются по пикселям.
+	var icon := Node2D.new()
 	icon.position = SIZE / 2.0 - Vector2(0, 6)
-	icon.mouse_filter = MOUSE_FILTER_IGNORE
 	icon.draw.connect(func(): draw_icon(id, icon, Vector2.ZERO, 40.0))
 	b.add_child(icon)
 
@@ -112,7 +112,7 @@ func make_booster(id: String) -> Button:
 	label.position = Vector2(-26, -28)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	badge.add_child(label)
-	buttons[id] = {"button": b, "badge": badge, "label": label}
+	buttons[id] = {"button": b, "icon": icon, "badge": badge, "label": label}
 	return b
 
 
@@ -186,16 +186,15 @@ func spend(id: String) -> void:
 
 # Бустер ждёт, пока игрок выберет цель: кнопка «дышит».
 func set_active(id: String, on: bool) -> void:
-	var b := button_of(id)
+	var icon: Node2D = buttons[id].icon
 	if active_tween:
 		active_tween.kill()
 		active_tween = null
-	b.pivot_offset = b.size / 2.0
-	b.scale = Vector2.ONE
+	icon.scale = Vector2.ONE
 	if on:
-		active_tween = b.create_tween().set_loops()
-		active_tween.tween_property(b, "scale", Vector2.ONE * 1.1, 0.35).set_trans(Tween.TRANS_SINE)
-		active_tween.tween_property(b, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_SINE)
+		active_tween = icon.create_tween().set_loops()
+		active_tween.tween_property(icon, "scale", Vector2.ONE * 1.18, 0.35).set_trans(Tween.TRANS_SINE)
+		active_tween.tween_property(icon, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_SINE)
 
 
 func shake(c: Control) -> void:
