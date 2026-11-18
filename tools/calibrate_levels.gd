@@ -70,21 +70,37 @@ func play(source: Level, source_columns: Array, rng: RandomNumberGenerator) -> b
 	while level.blocks_left() > 0:
 		var options := []
 		for c in columns.size():
-			if not columns[c].is_empty():
+			if not columns[c].is_empty() and partner_column(columns, c) != -2:
 				options.append(c)
 		for i in slots.size():
 			options.append(-1 - i)
 		if options.is_empty():
 			return false
 		var pick: int = options[rng.randi() % options.size()]
-		var s: Dictionary
+		var riders := []
 		if pick >= 0:
-			s = columns[pick].pop_front().duplicate()
+			# Связанная пара уезжает вместе: напарник делает свой круг сразу следом.
+			var other := partner_column(columns, pick)
+			riders.append(columns[pick].pop_front().duplicate())
+			if other >= 0:
+				riders.append(columns[other].pop_front().duplicate())
 		else:
-			s = slots.pop_at(-1 - pick)
-		s.ammo -= level.simulate_lap(s.color, s.ammo)
-		if s.ammo > 0:
-			if slots.size() >= Level.SLOTS:
-				return false
-			slots.append(s)
+			riders.append(slots.pop_at(-1 - pick))
+		for s: Dictionary in riders:
+			s.ammo -= level.simulate_lap(s.color, s.ammo)
+			if s.ammo > 0:
+				if slots.size() >= Level.SLOTS:
+					return false
+				slots.append(s)
 	return true
+
+
+# Колонка напарника переднего стрелка колонки c: -1 — напарника нет, -2 — он ещё не впереди.
+func partner_column(columns: Array, c: int) -> int:
+	var s: Dictionary = columns[c][0]
+	if not s.has("pair"):
+		return -1
+	for k in columns.size():
+		if k != c and not columns[k].is_empty() and columns[k][0].get("pair", -1) == s.pair:
+			return k
+	return -2

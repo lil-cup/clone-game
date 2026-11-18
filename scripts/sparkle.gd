@@ -30,4 +30,4 @@ func _draw() -> void:
 	for k in 8:
 		var r := radius if k % 2 == 0 else radius * 0.28
 		points.append(Vector2.from_angle(TAU * k / 8 - PI / 2) * r)
-	draw_colored_polygon(points, color)
+	UI.smooth_polygon(self, points, color, 1.5)

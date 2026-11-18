@@ -11,8 +11,14 @@ var last_lane := Vector2i(-1, -1)
 var column := -1
 var slot := -1
 
+var partner: Shooter  # связанный стрелок: уезжают на ленту только вместе
+var hideable := false  # уровень разрешает ему прятать цвет, пока он не впереди
+var hidden := false  # цвет и заряды скрыты, пока стрелок не выйдет вперёд в колонке
+var material: StandardMaterial3D
 var label: Label3D
 var visual: Node3D  # всё, что видно; прыгает отдельно от позиции стрелка
+
+const MYSTERY := Color("8a6cf0")  # цвет скрытого стрелка
 
 const NUMBERS_FONT := preload("res://fonts/nunito_numbers.tres")
 
@@ -32,8 +38,8 @@ func setup(new_color: String, new_ammo: int) -> void:
 	color = new_color
 	ammo = new_ammo
 
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Level.COLORS[color]
+	material = StandardMaterial3D.new()
+	var mat := material
 
 	if body_mesh == null:
 		body_mesh = RoundedBox.make(Vector3(1.9, 1.0, 1.7), 0.35, 3)
@@ -61,14 +67,12 @@ func setup(new_color: String, new_ammo: int) -> void:
 	label.no_depth_test = true
 	label.font = NUMBERS_FONT
 	label.font_size = 72
-	# Тонкая обводка тёмным оттенком цвета стрелка — мягче, чем чёрная.
 	label.outline_size = 11
-	label.outline_modulate = Level.COLORS[color].darkened(0.55)
 	label.pixel_size = 0.012
 	# На верхней грани корпуса: камера наклонена, и метка повыше съезжала бы вверх с блока.
 	label.position.y = 1.1
 	visual.add_child(label)
-	update_label()
+	paint()
 
 
 # Кончик ствола в мировых координатах (учитывает поворот и масштаб стрелка).
@@ -88,8 +92,34 @@ func hop() -> void:
 	t.tween_property(visual, "scale", Vector3.ONE, 0.08)
 
 
+# «Нельзя»: стрелок мотает корпусом из стороны в сторону.
+func wiggle() -> void:
+	var t := create_tween()
+	for angle in [0.3, -0.3, 0.15, 0.0]:
+		t.tween_property(visual, "rotation:y", angle, 0.06)
+
+
 func update_label() -> void:
-	label.text = str(ammo)
+	label.text = "?" if hidden else str(ammo)
+
+
+# Скрыть или открыть цвет. Открытие — с прыжком, чтобы было заметно.
+func set_hidden(value: bool, animated: bool) -> void:
+	if value == hidden:
+		return
+	hidden = value
+	paint()
+	if animated and not hidden:
+		hop()
+
+
+func paint() -> void:
+	var c: Color = MYSTERY if hidden else Level.COLORS[color]
+	material.albedo_color = c
+	# Тонкая обводка тёмным оттенком цвета стрелка — мягче, чем чёрная.
+	var alpha := label.outline_modulate.a
+	label.outline_modulate = Color(c.darkened(0.55), alpha)
+	update_label()
 
 
 func set_dimmed(dimmed: bool) -> void:

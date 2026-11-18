@@ -183,8 +183,8 @@ func make_divider(text: String) -> Control:
 			var y := line.size.y / 2.0
 			var tip := line.size.x if side == 0 else 0.0
 			line.draw_line(Vector2(0, y), Vector2(line.size.x, y), OUTLINE, 4)
-			line.draw_colored_polygon(PackedVector2Array([
-				Vector2(tip, y - 8), Vector2(tip + 8, y), Vector2(tip, y + 8), Vector2(tip - 8, y)]), OUTLINE))
+			UI.smooth_polygon(line, PackedVector2Array([
+				Vector2(tip, y - 8), Vector2(tip + 8, y), Vector2(tip, y + 8), Vector2(tip - 8, y)]), OUTLINE, 1.5))
 		row.add_child(line)
 		if side == 0:
 			row.add_child(outlined(text, 40, 10))
@@ -263,6 +263,10 @@ func _ready() -> void:
 	t.parallel().tween_property(badge, "scale", Vector2.ONE * BADGE_SCALE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 	if won:
+		# Салют поверх затемнения, но под карточкой.
+		var fireworks := Fireworks.make()
+		add_child(fireworks)
+		move_child(fireworks, dim.get_index() + 1)
 		# Крылья раскрываются от кубка в стороны, за ним разгораются лучи.
 		wings.scale = Vector2(0.0, 0.4) * BADGE_SCALE
 		t = create_tween()
@@ -330,7 +334,7 @@ func draw_rays(c: Control, count: int, radius: float, color: Color) -> void:
 		var points := PackedVector2Array([Vector2.ZERO, Vector2.from_angle(angle - half) * radius, Vector2.from_angle(angle + half) * radius])
 		c.draw_polygon(points, PackedColorArray([Color(color, 0.55), clear, clear]))
 	for k in 5:
-		c.draw_circle(Vector2.ZERO, radius * 0.12 * (5 - k), Color(color, 0.07))
+		c.draw_circle(Vector2.ZERO, radius * 0.12 * (5 - k), Color(color, 0.07), true, -1.0, true)
 
 
 # Два крыла по три пера, веером вверх и в стороны.
@@ -360,7 +364,7 @@ func draw_trophy(c: Control) -> void:
 		bowl.append(Vector2(52 * cos(a), -64 + 66 * sin(a)))
 	var outline := bowl.duplicate()
 	outline.append(bowl[0])
-	c.draw_colored_polygon(bowl, CoinIcon.GOLD)
+	UI.smooth_polygon(c, bowl, CoinIcon.GOLD, 1.5)
 	c.draw_polyline(outline, CoinIcon.RIM, 5, true)
 	c.draw_rect(Rect2(-58, -74, 116, 16), CoinIcon.EDGE)
 	c.draw_rect(Rect2(-58, -74, 116, 16), CoinIcon.RIM, false, 4)
@@ -375,25 +379,25 @@ func draw_cloud(c: Control) -> void:
 	var puffs := [Vector2(-78, 6), Vector2(-46, -14), Vector2(0, -24), Vector2(46, -14), Vector2(78, 6), Vector2(0, 8)]
 	var sizes := [30.0, 38.0, 42.0, 38.0, 30.0, 44.0]
 	for k in puffs.size():
-		c.draw_circle(puffs[k] + Vector2(0, 5), sizes[k], CLOUD.darkened(0.25))
+		c.draw_circle(puffs[k] + Vector2(0, 5), sizes[k], CLOUD.darkened(0.25), true, -1.0, true)
 	for k in puffs.size():
-		c.draw_circle(puffs[k], sizes[k], CLOUD)
+		c.draw_circle(puffs[k], sizes[k], CLOUD, true, -1.0, true)
 
 
 # Мультяшный череп с ушками: круглая голова, челюсть с зубами, тёмные глазницы.
 func draw_skull(c: Control) -> void:
 	for side in [-1.0, 1.0]:
-		c.draw_colored_polygon(PackedVector2Array([
-			Vector2(side * 30, -50), Vector2(side * 52, -78), Vector2(side * 54, -30)]), BONE_DARK)
-		c.draw_colored_polygon(PackedVector2Array([
-			Vector2(side * 33, -48), Vector2(side * 49, -70), Vector2(side * 50, -34)]), BONE)
-	c.draw_circle(Vector2(0, -20), 54, BONE_DARK)
+		UI.smooth_polygon(c, PackedVector2Array([
+			Vector2(side * 30, -50), Vector2(side * 52, -78), Vector2(side * 54, -30)]), BONE_DARK, 1.5)
+		UI.smooth_polygon(c, PackedVector2Array([
+			Vector2(side * 33, -48), Vector2(side * 49, -70), Vector2(side * 50, -34)]), BONE, 1.5)
+	c.draw_circle(Vector2(0, -20), 54, BONE_DARK, true, -1.0, true)
 	c.draw_rect(Rect2(-32, 6, 64, 40), BONE_DARK)
-	c.draw_circle(Vector2(0, -20), 49, BONE)
+	c.draw_circle(Vector2(0, -20), 49, BONE, true, -1.0, true)
 	c.draw_rect(Rect2(-27, 6, 54, 35), BONE)
 	for side in [-1.0, 1.0]:
-		c.draw_circle(Vector2(side * 20, -18), 14, BONE_DARK)
-	c.draw_colored_polygon(PackedVector2Array([Vector2(0, 2), Vector2(-6, 12), Vector2(6, 12)]), BONE_DARK)
+		c.draw_circle(Vector2(side * 20, -18), 14, BONE_DARK, true, -1.0, true)
+	UI.smooth_polygon(c, PackedVector2Array([Vector2(0, 2), Vector2(-6, 12), Vector2(6, 12)]), BONE_DARK, 1.5)
 	for x in [-9.0, 9.0]:
 		c.draw_line(Vector2(x, 26), Vector2(x, 41), BONE_DARK, 4)
 	c.draw_line(Vector2(-27, 26), Vector2(27, 26), BONE_DARK, 4)
@@ -430,7 +434,7 @@ func draw_heart(c: Control) -> void:
 		var shape := without_crowding(half[0])
 		var outline := shape.duplicate()
 		outline.append(shape[0])
-		c.draw_colored_polygon(shape, HEART)
+		UI.smooth_polygon(c, shape, HEART, 1.5)
 		c.draw_polyline(outline, HEART_DARK, 5, true)
 	# Блик на левой половинке.
 	c.draw_set_transform(center + Vector2(-7 * crack - 30, -28), -0.6, Vector2(14, 8))
@@ -451,7 +455,7 @@ func without_crowding(points: PackedVector2Array) -> PackedVector2Array:
 
 
 # Классическая кривая сердца, ямка сверху при t = 0, кончик снизу при t = PI.
-func heart_point(t: float) -> Vector2:
+static func heart_point(t: float) -> Vector2:
 	var x := 16.0 * pow(sin(t), 3)
 	var y := 13.0 * cos(t) - 5.0 * cos(2 * t) - 2.0 * cos(3 * t) - cos(4 * t)
 	return Vector2(x, -y + 2.0)
@@ -463,8 +467,8 @@ func draw_ribbon(c: Control) -> void:
 		var tail := PackedVector2Array([
 			Vector2(side * 220, -22), Vector2(side * 296, -22), Vector2(side * 270, 14),
 			Vector2(side * 296, 50), Vector2(side * 220, 50)])
-		c.draw_colored_polygon(tail, RIBBON_DARK)
-		c.draw_colored_polygon(PackedVector2Array([Vector2(side * 230, 48), Vector2(side * 250, 48), Vector2(side * 250, 66)]), OUTLINE)
+		UI.smooth_polygon(c, tail, RIBBON_DARK, 1.5)
+		UI.smooth_polygon(c, PackedVector2Array([Vector2(side * 230, 48), Vector2(side * 250, 48), Vector2(side * 250, 66)]), OUTLINE, 1.5)
 	var style := StyleBoxFlat.new()
 	style.bg_color = RIBBON
 	style.border_color = OUTLINE

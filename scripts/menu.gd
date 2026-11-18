@@ -30,6 +30,11 @@ var badge: PanelContainer
 var coins_shown := 0
 var coins_label: Label
 var coins_icon: CoinIcon
+var coins_panel: PanelContainer
+var lives_panel: PanelContainer
+var lives_heart: Control
+var lives_label: Label
+var lives_shown := -1
 var sparkles: Control     # слой искорок под летящими монетками
 var sparkle_wait := 0.0
 var coin_sound: AudioStreamPlayer
@@ -86,6 +91,11 @@ func _ready() -> void:
 		play.add_theme_constant_override("shadow_offset_y", 0)
 		play.size_flags_horizontal = SIZE_SHRINK_CENTER
 		layout.add_child(padded(play, 12, 64))
+		# Самый первый запуск: рука подсказывает, куда жать.
+		if completed == 0:
+			var hand := PointerHand.make()
+			hand.position = Vector2(250, 92)
+			play.add_child(hand)
 	else:
 		var done := UI.label("Все уровни пройдены!", 44)
 		done.add_theme_color_override("font_outline_color", BACKGROUND_EDGE.darkened(0.4))
@@ -95,7 +105,10 @@ func _ready() -> void:
 		done.grow_vertical = GROW_DIRECTION_BOTH
 		map.add_child(done)
 
-	add_child(make_coins_counter())
+	lives_panel = make_lives_counter()
+	add_child(lives_panel)
+	coins_panel = make_coins_counter()
+	add_child(coins_panel)
 	sparkles = Control.new()
 	sparkles.set_anchors_preset(PRESET_FULL_RECT)
 	sparkles.mouse_filter = MOUSE_FILTER_IGNORE
@@ -113,6 +126,7 @@ func _ready() -> void:
 	add_child(coins_burst_sound)
 
 	await get_tree().process_frame
+	coins_panel.position.x = lives_panel.position.x + lives_panel.size.x + 16
 	layout_levels()
 	if new_coins > 0:
 		drop_coins(new_coins)
@@ -207,7 +221,7 @@ func draw_path() -> void:
 	var current := point_at(0)
 	# Мягкое свечение вокруг текущего уровня.
 	for k in 6:
-		map.draw_circle(current, CURRENT_SIZE * (0.62 + 0.09 * k), Color(1, 1, 1, 0.05))
+		map.draw_circle(current, CURRENT_SIZE * (0.62 + 0.09 * k), Color(1, 1, 1, 0.05), true, -1.0, true)
 	# Золотая дорожка от уровня к уровню, выше — до края экрана, всё бледнее.
 	var top := buttons.size()
 	for k in top:
@@ -236,7 +250,7 @@ func draw_doodles(canvas: Control) -> void:
 				0:
 					canvas.draw_arc(c, r, 0, TAU, 28, DOODLE, 5, true)
 					for side in [-1, 1]:
-						canvas.draw_circle(c + Vector2(side * r * 0.35, -r * 0.15).rotated(turn), r * 0.12, DOODLE)
+						canvas.draw_circle(c + Vector2(side * r * 0.35, -r * 0.15).rotated(turn), r * 0.12, DOODLE, true, -1.0, true)
 					canvas.draw_arc(c, r * 0.55, 0.3 + turn, PI - 0.3 + turn, 12, DOODLE, 5, true)
 				1:
 					var star := PackedVector2Array()
@@ -254,6 +268,76 @@ func draw_doodles(canvas: Control) -> void:
 				_:
 					canvas.draw_arc(c, r * 0.8, 0, TAU, 24, DOODLE, 5, true)
 					canvas.draw_arc(c, r * 0.35, 0, TAU, 16, DOODLE, 5, true)
+
+
+# ---------- Жизни ----------
+
+# Счётчик жизней в левом верхнем углу: сердце с числом и «Макс» или время до следующей.
+func make_lives_counter() -> PanelContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.03, 0.12, 0.35, 0.55)
+	style.set_corner_radius_all(32)
+	style.content_margin_left = 10
+	style.content_margin_right = 26
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	panel.add_theme_stylebox_override("panel", style)
+	panel.position = Vector2(24, 32)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	panel.add_child(row)
+	lives_heart = Control.new()
+	lives_heart.custom_minimum_size = Vector2(60, 56)
+	lives_heart.draw.connect(draw_lives_heart)
+	row.add_child(lives_heart)
+	lives_label = UI.label("", 34)
+	lives_label.add_theme_color_override("font_outline_color", BACKGROUND_EDGE.darkened(0.5))
+	lives_label.add_theme_constant_override("outline_size", 10)
+	lives_label.custom_minimum_size.x = 100
+	row.add_child(lives_label)
+	update_lives()
+	return panel
+
+
+func draw_lives_heart() -> void:
+	var c := lives_heart.size / 2.0
+	UI.draw_heart(lives_heart, c - Vector2(0, 5), 50.0)
+	if Progress.lives_infinite():
+		draw_infinity(lives_heart, c + Vector2(0, -3), 14.0)
+		return
+	var font := UI.number_font()
+	var at := c + Vector2(-30, 7)
+	lives_heart.draw_string_outline(font, at, str(lives_shown), HORIZONTAL_ALIGNMENT_CENTER, 60, 30, 10, ResultScreen.OUTLINE)
+	lives_heart.draw_string(font, at, str(lives_shown), HORIZONTAL_ALIGNMENT_CENTER, 60, 30, Color.WHITE)
+
+
+# Знак бесконечности (лемниската) белым с тёмной обводкой.
+func draw_infinity(c: Control, center: Vector2, a: float) -> void:
+	var points := PackedVector2Array()
+	for i in 49:
+		var t := TAU * i / 48
+		var d := 1.0 + sin(t) * sin(t)
+		points.append(center + Vector2(a * cos(t) / d, a * sin(t) * cos(t) / d))
+	c.draw_polyline(points, ResultScreen.OUTLINE, 10, true)
+	c.draw_polyline(points, Color.WHITE, 4.5, true)
+
+
+func update_lives() -> void:
+	if Progress.lives_infinite():
+		lives_label.text = "Безлимит"
+		return
+	var lives := Progress.lives()
+	if lives != lives_shown:
+		lives_shown = lives
+		lives_heart.queue_redraw()
+	var wait := Progress.next_life_in()
+	lives_label.text = "Макс" if lives >= Progress.MAX_LIVES else "%d:%02d" % [wait / 60, wait % 60]
+
+
+func _process(_delta: float) -> void:
+	update_lives()
 
 
 # ---------- Монеты ----------
@@ -358,9 +442,9 @@ func draw_gear(canvas: Control, hole: Color) -> void:
 		var dir := Vector2.from_angle(angle)
 		var side := dir.orthogonal() * 5.0
 		var points := PackedVector2Array([dir * 12 - side, dir * 22 - side, dir * 22 + side, dir * 12 + side])
-		canvas.draw_colored_polygon(points, Color.WHITE)
-	canvas.draw_circle(Vector2.ZERO, 16, Color.WHITE)
-	canvas.draw_circle(Vector2.ZERO, 7, hole)
+		UI.smooth_polygon(canvas, points, Color.WHITE, 1.5)
+	canvas.draw_circle(Vector2.ZERO, 16, Color.WHITE, true, -1.0, true)
+	canvas.draw_circle(Vector2.ZERO, 7, hole, true, -1.0, true)
 
 
 # Затемнение и карточка по центру, как пауза в игре.
@@ -423,5 +507,11 @@ func reset_progress() -> void:
 
 
 func start(i: int) -> void:
+	if i >= Progress.FREE_LEVELS and Progress.lives() <= 0:
+		var wait := Progress.next_life_in()
+		show_settings_card("Нет жизней", "Новая жизнь через %d:%02d" % [wait / 60, wait % 60], [
+			["Назад", UI.PURPLE, settings_panel.hide],
+		])
+		return
 	Game.level_index = i
 	get_tree().change_scene_to_file("res://scenes/game.tscn")

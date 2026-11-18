@@ -23,6 +23,29 @@ const LEVELS_PER_DIFFICULTY := 10
 
 const COLUMNS := 4
 
+# С какого уровня (с нуля) появляются связанные стрелки: пара уезжает на ленту только вместе.
+const LINKS_FROM := 3
+
+# Особенности уровня, чтобы уровни отличались не только картинкой:
+# hidden — какая доля стрелков позади первого в колонке скрывает цвет (0 — никто, 1 — все),
+# links  — сколько связанных пар.
+# Первые уровни знакомят с особенностями по одной, дальше наборы идут по кругу,
+# а пар с каждым десятком уровней становится больше.
+const INTRO_TWISTS := [
+	{"hidden": 0.0, "links": 0},  # 1 — обучение
+	{"hidden": 1.0, "links": 0},  # 2 — новинка: скрытые
+	{"hidden": 0.5, "links": 0},  # 3 — первый бустер
+	{"hidden": 0.0, "links": 2},  # 4 — новинка: связанные
+]
+const TWISTS := [
+	{"hidden": 0.5, "links": 2},
+	{"hidden": 1.0, "links": 0},
+	{"hidden": 0.0, "links": 4},
+	{"hidden": 1.0, "links": 3},
+	{"hidden": 0.3, "links": 1},
+	{"hidden": 0.7, "links": 5},
+]
+
 # Мест для стрелков, вернувшихся с патронами. Одинаково на всех уровнях.
 const SLOTS := 5
 
@@ -38,11 +61,12 @@ const MIN_AMMO := 10
 # min_ammo — меньше скольких патронов стрелков не делаем (см. MIN_AMMO)
 # target  — какую долю игр должен выигрывать бот, жмущий наугад (подбирается tools/calibrate_levels.gd)
 const DIFFICULTIES := [
-	{"caps": [20, 30, 40], "spread": 0.4, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.25},
-	{"caps": [25, 35, 50], "spread": 0.25, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.06},
-	{"caps": [30, 45, 60], "spread": 0.15, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.02},
+	{"caps": [20, 30, 40], "spread": 0.4, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.15},
+	{"caps": [25, 40, 50], "spread": 0.25, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.03},
+	{"caps": [30, 45, 60], "spread": 0.15, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.01},
 ]
 
+var index := 0
 var size := 0
 var cells: Array[String] = []  # "" = пусто, иначе буква цвета
 var name := ""
@@ -66,6 +90,7 @@ static func load_map(index: int) -> Level:
 	var data: Dictionary = Levels.LIST[index]
 	var map: Array = data.map
 	level.name = data.name
+	level.index = index
 	level.difficulty = index / LEVELS_PER_DIFFICULTY
 	level.settings = DIFFICULTIES[mini(level.difficulty, DIFFICULTIES.size() - 1)]
 	level.size = map.size()
@@ -245,9 +270,12 @@ static func busy(waiting: Array[Vector2i], from: int, to: int) -> int:
 # поэтому, беря стрелков в этом порядке, уровень проходится без слотов.
 func make_columns(rng: RandomNumberGenerator) -> Array[Array]:
 	var list := generate_shooters(rng)
+	var twist := twist()
+	add_links(list, rng, twist.links)
 	var columns: Array[Array] = []
 	for c in COLUMNS:
 		columns.append([])
+	var prev := -1  # колонка предыдущего стрелка
 	for i in list.size():
 		var c := i % COLUMNS
 		if rng.randf() < settings.shuffle:
@@ -255,5 +283,45 @@ func make_columns(rng: RandomNumberGenerator) -> Array[Array]:
 			var shortest: int = columns.map(func(col): return col.size()).min()
 			var options := range(COLUMNS).filter(func(k): return columns[k].size() <= shortest + 1)
 			c = options[rng.randi() % options.size()]
+		# Второй из связанной пары — в соседнюю колонку: в той же он стоял бы за первым и пара
+		# не ушла бы, а через колонку трубка тянулась бы поверх чужих стрелков.
+		if linked_to_previous(list, i):
+			var near := [prev - 1, prev + 1].filter(func(k): return k >= 0 and k < COLUMNS)
+			c = near[rng.randi() % near.size()]
 		columns[c].append(list[i])
+		prev = c
+	# Кто из стрелков прячет цвет — отдельным генератором, чтобы не сдвигать раскладку.
+	var hide_rng := RandomNumberGenerator.new()
+	hide_rng.seed = rng.seed + 7919
+	for item in list:
+		item.hide = hide_rng.randf() < twist.hidden
 	return columns
+
+
+# Связывает несколько пар соседних по решению стрелков. Соседние — значит, когда приходит
+# очередь первого, второй тоже уже стоит впереди своей колонки, и пара может уехать вместе.
+func add_links(list: Array[Dictionary], rng: RandomNumberGenerator, want: int) -> void:
+	var pairs := 0
+	var i := 1  # самого первого стрелка не связываем — пусть начало будет простым
+	while i < list.size() - 1 and pairs < want:
+		if rng.randf() < 0.35:
+			list[i].pair = pairs
+			list[i + 1].pair = pairs
+			pairs += 1
+			i += 2
+		else:
+			i += 1
+
+
+func twist() -> Dictionary:
+	if index < INTRO_TWISTS.size():
+		return INTRO_TWISTS[index]
+	var k := index - INTRO_TWISTS.size()
+	var t: Dictionary = TWISTS[k % TWISTS.size()].duplicate()
+	if t.links > 0:
+		t.links += k / 10
+	return t
+
+
+static func linked_to_previous(list: Array, i: int) -> bool:
+	return i > 0 and list[i].has("pair") and list[i - 1].get("pair", -1) == list[i].pair

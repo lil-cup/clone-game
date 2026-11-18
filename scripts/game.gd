@@ -16,6 +16,8 @@ const CAMERA_TILT := 62.0    # угол камеры к полу в градус
 const BOARD_COLOR := Color("2a2942")
 const SLOT_COLOR := Color("2a2942")
 const HUD_TEXT := Color.WHITE
+const HIDDEN_FROM := 1       # уровень (с нуля), где впервые появляются скрытые стрелки
+const BOOSTERS_FROM := 2     # с какого уровня (с нуля) видна панель бустеров
 
 static var level_index := 0
 
@@ -33,6 +35,7 @@ var last_entry := -100.0
 var finished := false
 var reward_claimed := false
 var belt_speed := SPEED
+var links: Array[Dictionary] = []  # {a, b, tube} — связанные пары в колонках
 var materials := {}
 var bullet_mesh := SphereMesh.new()
 var piece_mesh: ArrayMesh
@@ -41,6 +44,11 @@ var pop_sound: AudioStreamPlayer
 var win_sound: AudioStreamPlayer
 var fail_sound: AudioStreamPlayer
 
+var hud: CanvasLayer
+var tutorial: Tutorial  # только на первом уровне, пока он не пройден
+var booster_bar: BoosterBar
+var picking := false  # включён бустер «любой стрелок»: ждём, кого выберут
+var belt_limit := MAX_ON_BELT  # бустер добавляет к нему место
 var belt_label: Label
 var belt_badge: Control
 var result_panel: Control
@@ -68,21 +76,56 @@ func _ready() -> void:
 	for c in Level.COLUMNS:
 		columns.append([])
 	var data := level.make_columns(rng)
+	var pairs := {}  # номер пары -> первый из пары
 	for c in Level.COLUMNS:
 		for item in data[c]:
 			var s := Shooter.new()
 			add_child(s)
 			s.scale = Vector3.ONE * BIG
 			s.setup(item.color, item.ammo)
+			s.hideable = item.hide
 			s.column = c
 			columns[c].append(s)
+			if item.has("pair"):
+				if pairs.has(item.pair):
+					link(pairs[item.pair], s)
+				else:
+					pairs[item.pair] = s
 	layout_columns(false)
+	update_links()
 
 	get_viewport().size_changed.connect(fit_camera)
 	fit_camera()
+	update_belt_label()
+
+	if level_index == 0 and Progress.completed() == 0:
+		tutorial = Tutorial.make(self, hud)
+		hud.add_child(tutorial)
+		tutorial.start()
+	# Уровень, где впервые появляются скрытые стрелки: сначала объясняем, игра ждёт.
+	if level_index == HIDDEN_FROM and Progress.completed() <= HIDDEN_FROM:
+		get_tree().paused = true
+		hud.add_child(NoveltyScreen.make("Этот стрелок скрывает свой цвет!\nОн откроется, когда выйдет вперёд",
+				NoveltyScreen.HIDDEN, func(): get_tree().paused = false))
+	if level_index == Level.LINKS_FROM and Progress.completed() <= Level.LINKS_FROM:
+		get_tree().paused = true
+		hud.add_child(NoveltyScreen.make("Связанные стрелки едут на ленту вместе!\nОба должны стоять впереди",
+				NoveltyScreen.LINKED, func(): get_tree().paused = false))
+	# Новый бустер дарим один раз, а потом показываем, как им пользоваться (игра ждёт).
+	var gift := booster_bar.next_gift() if booster_bar else ""
+	if gift != "":
+		get_tree().paused = true
+		hud.add_child(CardScreen.booster_gift(gift, func():
+			Progress.take_booster_gift(gift)
+			booster_bar.refresh()
+			if not tutorial:
+				tutorial = Tutorial.make(self, hud)
+				hud.add_child(tutorial)
+			tutorial.booster_hint(booster_bar, gift)))
 
 
 func _process(delta: float) -> void:
+	update_links()
 	if finished:
 		return
 	var target := SPEED * ENDGAME_BOOST if endgame() else SPEED
@@ -91,14 +134,21 @@ func _process(delta: float) -> void:
 	try_enter()
 	for s in belt.duplicate():
 		move_on_belt(s, delta)
-	belt_label.text = "%d/%d" % [on_belt_count(), MAX_ON_BELT]
+	update_belt_label()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if finished:
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		var s := pick(screen_to_world(event.position))
+		var point := screen_to_world(event.position)
+		if picking:
+			var any := pick_in_columns(point)
+			if any:
+				UI.play_click(self)
+				pick_any(any)
+			return
+		var s := pick(point)
 		if s:
 			UI.play_click(self)
 			send_to_belt(s)
@@ -121,11 +171,47 @@ func pick(point: Vector3) -> Shooter:
 	return null
 
 
+# Любой стрелок в колонках, не только передний (для бустера).
+func pick_in_columns(point: Vector3) -> Shooter:
+	for col in columns:
+		for s: Shooter in col:
+			if absf(s.position.x - point.x) < 1.8 and absf(s.position.z - point.z) < 1.8:
+				return s
+	return null
+
+
 func send_to_belt(s: Shooter) -> void:
-	if on_belt_count() >= MAX_ON_BELT:
+	var group: Array[Shooter] = [s]
+	if s.partner:
+		# Пара уезжает только вместе, и напарник тоже должен быть под рукой:
+		# впереди своей колонки или в слоте.
+		if not can_go(s.partner):
+			s.wiggle()
+			s.partner.wiggle()
+			return
+		group.append(s.partner)
+	if on_belt_count() + group.size() > belt_limit:
 		flash(belt_badge)
 		return
+	for one in group:
+		launch(one)
+	if tutorial:
+		tutorial.shooter_sent(s)
+		if on_belt_count() >= belt_limit:
+			tutorial.belt_full()
+
+
+func can_go(s: Shooter) -> bool:
+	if s.state == Shooter.State.IN_SLOT:
+		return true
+	return s.state == Shooter.State.IN_COLUMN and columns[s.column].front() == s
+
+
+func launch(s: Shooter) -> void:
 	if s.state == Shooter.State.IN_COLUMN:
+		# Бустером можно взять и скрытого из глубины колонки — он сразу открывается.
+		s.set_hidden(false, false)
+		s.set_dimmed(false)
 		columns[s.column].erase(s)
 		s.column = -1
 		layout_columns(true)
@@ -168,6 +254,14 @@ func try_enter() -> void:
 		belt.append(s))
 
 
+# Передний стрелок первой непустой колонки.
+func first_in_columns() -> Shooter:
+	for col in columns:
+		if not col.is_empty():
+			return col[0]
+	return null
+
+
 func columns_empty() -> bool:
 	return columns.all(func(col): return col.is_empty())
 
@@ -188,6 +282,11 @@ func endgame() -> bool:
 	return shooters_left() <= ENDGAME_SHOOTERS
 
 
+# Обновляется и в _process, и отдельно: на паузе (подарок, обучение) _process стоит.
+func update_belt_label() -> void:
+	belt_label.text = "%d/%d" % [on_belt_count(), belt_limit]
+
+
 func on_belt_count() -> int:
 	return pending.size() + entering + belt.size()
 
@@ -195,6 +294,9 @@ func on_belt_count() -> int:
 # ---------- Лента и стрельба ----------
 
 func move_on_belt(s: Shooter, delta: float) -> void:
+	# Мог исчезнуть в этом же кадре вместе с напарником.
+	if s.state != Shooter.State.ON_BELT:
+		return
 	# Двигаемся маленькими шагами, чтобы не пропустить полосу при подлагивании.
 	var left := belt_speed * delta
 	while left > 0.0:
@@ -216,8 +318,10 @@ func move_on_belt(s: Shooter, delta: float) -> void:
 	s.rotation.y = rotation_towards(conveyor.inward(s.distance))
 
 
-# Возвращает true, если у стрелка кончились патроны.
+# Возвращает true, если стрелок исчез с ленты.
 func shoot(s: Shooter, lane: Vector2i) -> bool:
+	if s.ammo <= 0:
+		return false  # пустой из пары просто едет за напарником
 	var cell := level.first_block(lane.x, lane.y)
 	if cell.x < 0 or level.get_cell(cell.x, cell.y) != s.color:
 		return false
@@ -233,12 +337,29 @@ func shoot(s: Shooter, lane: Vector2i) -> bool:
 
 	if s.ammo > 0:
 		return false
+	# Из пары пустой не пропадает, пока у напарника есть заряды — исчезают они только вдвоём.
+	var partner := s.partner
+	if partner and partner.ammo > 0:
+		return false
+	unlink(s)
+	vanish(s)
+	if partner:
+		vanish(partner)
+	return true
+
+
+# Стрелок отстрелялся: убираем его отовсюду, где он мог быть, и он сжимается в точку.
+func vanish(s: Shooter) -> void:
 	belt.erase(s)
+	pending.erase(s)
+	if s.slot >= 0:
+		slots[s.slot] = null
+		s.slot = -1
+		compact_slots()
 	s.state = Shooter.State.MOVING
 	var t := create_tween()
 	t.tween_property(s, "scale", Vector3.ZERO, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	t.tween_callback(s.queue_free)
-	return true
 
 
 func finish_lap(s: Shooter) -> void:
@@ -253,7 +374,10 @@ func finish_lap(s: Shooter) -> void:
 	var t := move(s, slot_position(i))
 	t.parallel().tween_property(s, "rotation:y", 0.0, MOVE_TIME)
 	t.parallel().tween_property(s, "scale", Vector3.ONE * BIG, MOVE_TIME)
-	t.tween_callback(func(): s.state = Shooter.State.IN_SLOT)
+	t.tween_callback(func():
+		s.state = Shooter.State.IN_SLOT
+		if tutorial:
+			tutorial.landed_in_slot(s))
 
 
 func fire_projectile(s: Shooter, cell: Vector2i) -> void:
@@ -286,6 +410,92 @@ func pop_effect(pos: Vector3, color: Color) -> void:
 	t.chain().tween_callback(piece.queue_free)
 
 
+# ---------- Связанные стрелки ----------
+
+const LINK_SEGMENTS := 4  # из скольких кусков собрана дуга (половина — цвета одного стрелка)
+
+
+# Пара связана дугой-ручкой от макушки до макушки. Связь живёт, пока живы оба:
+# на ленте и в слотах пара тоже ездит вместе.
+func link(a: Shooter, b: Shooter) -> void:
+	a.partner = b
+	b.partner = a
+	var parts: Array[MeshInstance3D] = []
+	for i in LINK_SEGMENTS:
+		var capsule := CapsuleMesh.new()
+		capsule.radial_segments = 16
+		capsule.rings = 4
+		var part := MeshInstance3D.new()
+		part.mesh = capsule
+		var owner := a if i < LINK_SEGMENTS / 2 else b
+		part.material_override = tube_material(owner.color)
+		add_child(part)
+		parts.append(part)
+	links.append({"a": a, "b": b, "parts": parts})
+
+
+# Немного светлее стрелка и с бликом, чтобы дуга читалась поверх корпуса.
+func tube_material(color: String) -> StandardMaterial3D:
+	var key := "tube_" + color
+	if not materials.has(key):
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Level.COLORS[color].lightened(0.15)
+		mat.roughness = 0.3
+		materials[key] = mat
+	return materials[key]
+
+
+func unlink(s: Shooter) -> void:
+	for l in links:
+		if l.a == s or l.b == s:
+			links.erase(l)
+			l.a.partner = null
+			l.b.partner = null
+			for part: MeshInstance3D in l.parts:
+				var t := part.create_tween()
+				t.tween_property(part, "scale", Vector3.ZERO, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+				t.tween_callback(part.queue_free)
+			return
+
+
+# Дуга — кривая Безье от макушки одного стрелка через точку повыше к макушке другого.
+# Стрелки двигаются (и меняют размер: на ленте они мельче) — дуга следует за ними.
+func update_links() -> void:
+	for l in links:
+		var a: Shooter = l.a
+		var b: Shooter = l.b
+		var size := (a.scale.x + b.scale.x) / 2.0
+		var from := a.position + Vector3(0, 1.05 * a.scale.x, 0)
+		var to := b.position + Vector3(0, 1.05 * b.scale.x, 0)
+		var top := (from + to) / 2.0 + Vector3(0, 0.45 * size, 0)
+		var radius := 0.18 * size
+		var points: Array[Vector3] = []
+		for i in LINK_SEGMENTS + 1:
+			var t := float(i) / LINK_SEGMENTS
+			points.append(from.lerp(top, t).lerp(top.lerp(to, t), t))
+		for i in LINK_SEGMENTS:
+			place_capsule(l.parts[i], points[i], points[i + 1], radius)
+
+
+# Капсула от p до q: закруглённые концы соседних кусков сходятся в гладкую дугу.
+func place_capsule(part: MeshInstance3D, p: Vector3, q: Vector3, radius: float) -> void:
+	var dir := q - p
+	var length := dir.length()
+	if length < 0.001:
+		return
+	var capsule := part.mesh as CapsuleMesh
+	# Перестраиваем меш, только когда размер заметно поменялся.
+	if absf(capsule.height - (length + radius * 2.0)) > 0.02 or absf(capsule.radius - radius) > 0.005:
+		capsule.radius = radius
+		capsule.height = length + radius * 2.0
+	var y := dir / length
+	var x := y.cross(Vector3.UP)
+	if x.length() < 0.01:
+		x = y.cross(Vector3.RIGHT)
+	x = x.normalized()
+	part.transform = Transform3D(Basis(x, y, x.cross(y)), (p + q) / 2.0)
+
+
 # ---------- Раскладка ----------
 
 func bottom_edge() -> float:
@@ -316,6 +526,8 @@ func layout_columns(animated: bool) -> void:
 		for tier in columns[c].size():
 			var s: Shooter = columns[c][tier]
 			s.set_dimmed(tier > 0)
+			# Связанных не прячем: игрок должен видеть, кого тянет за собой пара.
+			s.set_hidden(s.hideable and tier > 0 and not s.partner, animated)
 			if animated:
 				move(s, column_position(c, tier))
 			else:
@@ -401,7 +613,7 @@ func fit_camera() -> void:
 	# Что обязательно должно влезть: поле с лентой по ширине,
 	# а по высоте — заголовок, поле, слоты и пара рядов стрелков.
 	var top := -bottom_edge() - 8.5
-	var bottom := column_position(0, 2).z + 2.0
+	var bottom := column_position(0, 2).z + (5.5 if booster_bar else 2.0)
 	var need_width := bottom_edge() * 2.0 + 2.0
 	var need_height := bottom - top
 	# На широком экране (браузер, компьютер) упираемся в высоту, на телефоне — в ширину.
@@ -435,7 +647,7 @@ func screen_to_world(screen: Vector2) -> Vector3:
 # ---------- Интерфейс ----------
 
 func make_hud() -> void:
-	var hud := CanvasLayer.new()
+	hud = CanvasLayer.new()
 	hud.process_mode = Node.PROCESS_MODE_ALWAYS  # кнопки паузы работают, пока игра стоит
 	add_child(hud)
 
@@ -469,6 +681,10 @@ func make_hud() -> void:
 	belt_label.add_theme_color_override("font_color", Color("2a2942"))
 	belt_badge.add_child(belt_label)
 	hud.add_child(belt_badge)
+
+	if level_index >= BOOSTERS_FROM:
+		booster_bar = BoosterBar.make(self)
+		hud.add_child(booster_bar)
 
 
 	result_panel = ColorRect.new()
@@ -532,10 +748,13 @@ func show_result(won: bool) -> void:
 	if finished:
 		return
 	finished = true
+	if tutorial:
+		tutorial.hide()
 
 	if not won:
 		fail_sound.play()
-		result_panel.get_parent().add_child(ResultScreen.fail("Уровень %d" % (level_index + 1), restart, go_to_menu))
+		Progress.lose_life(level_index)
+		result_panel.get_parent().add_child(ResultScreen.fail("Уровень %d" % (level_index + 1), retry, go_to_menu))
 		return
 	Progress.complete(level_index)
 	win_sound.play()
@@ -560,8 +779,26 @@ func show_pause() -> void:
 	get_tree().paused = true
 	show_panel("Пауза", "")
 	add_button("Продолжить", resume, UI.GREEN)
-	add_button("Заново", restart, UI.ORANGE)
-	add_button("В меню", go_to_menu, UI.PURPLE)
+	add_button("Заново", leave.bind("Заново", retry), UI.ORANGE)
+	add_button("В меню", leave.bind("Выход", go_to_menu), UI.PURPLE)
+
+
+# Бросить уровень посреди игры стоит жизни — сначала спрашиваем (на обучении жизни не тратятся).
+func leave(action: String, then: Callable) -> void:
+	if level_index < Progress.FREE_LEVELS:
+		then.call()
+		return
+	hud.add_child(CardScreen.lose_life(action, func():
+		Progress.lose_life(level_index)
+		then.call(), func(): pass))
+
+
+# Ещё попытка — если остались жизни, иначе на главный экран ждать новую.
+func retry() -> void:
+	if Progress.lives() > 0 or level_index < Progress.FREE_LEVELS:
+		restart()
+	else:
+		go_to_menu()
 
 
 func restart() -> void:
@@ -577,6 +814,67 @@ func resume() -> void:
 func go_to_menu() -> void:
 	get_tree().paused = false
 	get_tree().change_scene_to_file("res://scenes/menu.tscn")
+
+
+# Бустер: на ленте становится на одно место больше до конца уровня.
+func add_belt_slot() -> void:
+	belt_limit += 1
+	update_belt_label()
+	var base := belt_badge.scale
+	var t := belt_badge.create_tween()
+	t.tween_property(belt_badge, "scale", base * 1.3, 0.15)
+	t.tween_property(belt_badge, "scale", base, 0.2)
+	if tutorial:
+		tutorial.booster_used("slot")
+
+
+# Бустер «перемешать»: стрелки в колонках меняются местами, высота колонок та же.
+# Связанные пары остаются где стояли — иначе пара могла бы встать в одну колонку
+# друг за другом и уже никогда не уехать.
+func shuffle_columns() -> void:
+	var free: Array[Shooter] = []
+	for col in columns:
+		for s: Shooter in col:
+			if not s.partner:
+				free.append(s)
+	free.shuffle()
+	var k := 0
+	for c in columns.size():
+		for tier in columns[c].size():
+			if not columns[c][tier].partner:
+				var s := free[k]
+				k += 1
+				columns[c][tier] = s
+				s.column = c
+				s.hop()
+	layout_columns(true)
+	if tutorial:
+		tutorial.booster_used("shuffle")
+
+
+# Бустер «любой стрелок»: следующее нажатие выбирает стрелка в любом месте колонки.
+func start_picking() -> void:
+	picking = true
+	booster_bar.set_active("pick", true)
+	if tutorial:
+		tutorial.booster_used("pick")
+
+
+func stop_picking() -> void:
+	picking = false
+	booster_bar.set_active("pick", false)
+
+
+func pick_any(s: Shooter) -> void:
+	if on_belt_count() >= belt_limit:
+		flash(belt_badge)
+		return
+	stop_picking()
+	booster_bar.spend("pick")
+	unlink(s)
+	launch(s)
+	if tutorial:
+		tutorial.picked()
 
 
 func flash(label: CanvasItem) -> void:
