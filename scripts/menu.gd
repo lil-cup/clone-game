@@ -336,8 +336,15 @@ func update_lives() -> void:
 	lives_label.text = "Макс" if lives >= Progress.MAX_LIVES else "%d:%02d" % [wait / 60, wait % 60]
 
 
-func _process(_delta: float) -> void:
-	update_lives()
+# Таймер жизней обновляем раз в полсекунды: каждое обновление читает сохранение с диска.
+var lives_wait := 0.0
+
+
+func _process(delta: float) -> void:
+	lives_wait -= delta
+	if lives_wait <= 0.0:
+		lives_wait = 0.5
+		update_lives()
 
 
 # ---------- Монеты ----------

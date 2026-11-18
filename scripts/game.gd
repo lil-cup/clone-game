@@ -4,7 +4,7 @@ extends Node3D
 const MAX_ON_BELT := 5
 const FIELD := 18.0          # сторона поля в мире — одна на всех уровнях, мельчают только блоки
 const SPEED := 14.0          # единиц мира в секунду
-const ENDGAME_SHOOTERS := 5  # когда стрелков осталось столько или меньше — лента ускоряется
+const ENDGAME_SHOOTERS := 5  # колонки и слоты пусты, а на ленте столько или меньше — лента ускоряется
 const ENDGAME_BOOST := 1.8
 const ACCELERATION := 6.0    # насколько быстро лента разгоняется (клеток/с за секунду)
 const SPACING := 2.6         # расстояние между стрелками на ленте
@@ -35,6 +35,8 @@ var last_entry := -100.0
 var finished := false
 var reward_claimed := false
 var belt_speed := SPEED
+var link_cylinder: CylinderMesh
+var link_sphere: SphereMesh
 var links: Array[Dictionary] = []  # {a, b, tube} — связанные пары в колонках
 var materials := {}
 var bullet_mesh := SphereMesh.new()
@@ -266,20 +268,9 @@ func columns_empty() -> bool:
 	return columns.all(func(col): return col.is_empty())
 
 
-# Все стрелки, которые ещё не отстрелялись: в колонках, слотах и на ленте.
-func shooters_left() -> int:
-	var count := on_belt_count()
-	for col in columns:
-		count += col.size()
-	for s in slots:
-		if s:
-			count += 1
-	return count
-
-
-# Последние стрелки: считаются все — и в колонках, и в слотах после круга, и на ленте.
+# Последние стрелки: в колонках и в запасных слотах никого, на ленте ENDGAME_SHOOTERS или меньше.
 func endgame() -> bool:
-	return shooters_left() <= ENDGAME_SHOOTERS
+	return columns_empty() and slots.all(func(s): return s == null) and on_belt_count() <= ENDGAME_SHOOTERS
 
 
 # Обновляется и в _process, и отдельно: на паузе (подарок, обучение) _process стоит.
@@ -420,18 +411,40 @@ const LINK_SEGMENTS := 4  # из скольких кусков собрана д
 func link(a: Shooter, b: Shooter) -> void:
 	a.partner = b
 	b.partner = a
+	# Куски дуги — цилиндры, на стыках шарики, чтобы изгиб был гладким. Меши общие на всех,
+	# каждый кадр меняется только масштаб: пересобирать меш на каждом шаге ленты дорого
+	# (раньше из-за этого на уровнях с парами подлагивало).
+	if not link_cylinder:
+		link_cylinder = CylinderMesh.new()
+		link_cylinder.top_radius = 1.0
+		link_cylinder.bottom_radius = 1.0
+		link_cylinder.height = 1.0
+		link_cylinder.radial_segments = 16
+		link_cylinder.rings = 1
+		link_cylinder.cap_top = false
+		link_cylinder.cap_bottom = false
+		link_sphere = SphereMesh.new()
+		link_sphere.radius = 1.0
+		link_sphere.height = 2.0
+		link_sphere.radial_segments = 16
+		link_sphere.rings = 8
 	var parts: Array[MeshInstance3D] = []
+	var joints: Array[MeshInstance3D] = []
 	for i in LINK_SEGMENTS:
-		var capsule := CapsuleMesh.new()
-		capsule.radial_segments = 16
-		capsule.rings = 4
-		var part := MeshInstance3D.new()
-		part.mesh = capsule
 		var owner := a if i < LINK_SEGMENTS / 2 else b
-		part.material_override = tube_material(owner.color)
-		add_child(part)
-		parts.append(part)
-	links.append({"a": a, "b": b, "parts": parts})
+		parts.append(link_piece(link_cylinder, owner))
+	for i in LINK_SEGMENTS + 1:
+		var owner := a if i <= LINK_SEGMENTS / 2 else b
+		joints.append(link_piece(link_sphere, owner))
+	links.append({"a": a, "b": b, "parts": parts, "joints": joints})
+
+
+func link_piece(mesh: Mesh, owner: Shooter) -> MeshInstance3D:
+	var piece := MeshInstance3D.new()
+	piece.mesh = mesh
+	piece.material_override = tube_material(owner.color)
+	add_child(piece)
+	return piece
 
 
 # Немного светлее стрелка и с бликом, чтобы дуга читалась поверх корпуса.
@@ -451,7 +464,7 @@ func unlink(s: Shooter) -> void:
 			links.erase(l)
 			l.a.partner = null
 			l.b.partner = null
-			for part: MeshInstance3D in l.parts:
+			for part: MeshInstance3D in l.parts + l.joints:
 				var t := part.create_tween()
 				t.tween_property(part, "scale", Vector3.ZERO, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 				t.tween_callback(part.queue_free)
@@ -474,26 +487,23 @@ func update_links() -> void:
 			var t := float(i) / LINK_SEGMENTS
 			points.append(from.lerp(top, t).lerp(top.lerp(to, t), t))
 		for i in LINK_SEGMENTS:
-			place_capsule(l.parts[i], points[i], points[i + 1], radius)
+			place_tube(l.parts[i], points[i], points[i + 1], radius)
+		for i in LINK_SEGMENTS + 1:
+			l.joints[i].transform = Transform3D(Basis.from_scale(Vector3.ONE * radius), points[i])
 
 
-# Капсула от p до q: закруглённые концы соседних кусков сходятся в гладкую дугу.
-func place_capsule(part: MeshInstance3D, p: Vector3, q: Vector3, radius: float) -> void:
+# Цилиндр от p до q: единичный меш, растянутый по длине и толщине.
+func place_tube(part: MeshInstance3D, p: Vector3, q: Vector3, radius: float) -> void:
 	var dir := q - p
 	var length := dir.length()
 	if length < 0.001:
 		return
-	var capsule := part.mesh as CapsuleMesh
-	# Перестраиваем меш, только когда размер заметно поменялся.
-	if absf(capsule.height - (length + radius * 2.0)) > 0.02 or absf(capsule.radius - radius) > 0.005:
-		capsule.radius = radius
-		capsule.height = length + radius * 2.0
 	var y := dir / length
 	var x := y.cross(Vector3.UP)
 	if x.length() < 0.01:
 		x = y.cross(Vector3.RIGHT)
 	x = x.normalized()
-	part.transform = Transform3D(Basis(x, y, x.cross(y)), (p + q) / 2.0)
+	part.transform = Transform3D(Basis(x * radius, y * length, x.cross(y) * radius), (p + q) / 2.0)
 
 
 # ---------- Раскладка ----------
