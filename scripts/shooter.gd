@@ -14,7 +14,7 @@ var slot := -1
 var partner: Shooter  # связанный стрелок: уезжают на ленту только вместе
 var hideable := false  # уровень разрешает ему прятать цвет, пока он не впереди
 var hidden := false  # цвет и заряды скрыты, пока стрелок не выйдет вперёд в колонке
-var material: StandardMaterial3D
+var body: MeshInstance3D
 var label: Label3D
 var visual: Node3D  # всё, что видно; прыгает отдельно от позиции стрелка
 
@@ -22,45 +22,43 @@ const MYSTERY := Color("8a6cf0")  # цвет скрытого стрелка
 
 const NUMBERS_FONT := preload("res://fonts/nunito_numbers.tres")
 
-# Слой стрелков: только он отбрасывает тени (см. shadow_caster_mask у солнца в game.tscn).
-const SHADOW_LAYER := 2
+# Общие на всех: материалы по цвету и мягкое пятно-тень под ногами
+# (настоящие тени от солнца на телефонах дорогие — каждая панда рисовалась бы дважды).
+static var materials := {}
+static var blob_mesh: PlaneMesh
+static var blob_material: StandardMaterial3D
 
-# Ствол: где стоит и где его кончик (оттуда вылетают снаряды), в координатах стрелка.
-const BARREL_POSITION := Vector3(0, 0.6, -1.1)
-const MUZZLE := Vector3(0, 0.6, -1.4)
+# Модель-панда из Blender — один меш, оттенки частей в цветах вершин: тело белое,
+# пятна у глаз серые, глаза и нос чёрные. Материал умножает их на цвет пушки, поэтому
+# панда однотонная, а один материал на цвет годится для всех панд этого цвета.
+const MODEL := preload("res://models/panda.glb")
 
-# Меши общие для всех стрелков: создаются один раз.
-static var body_mesh: ArrayMesh
-static var barrel_mesh: ArrayMesh
+# Откуда вылетают снаряды (мордочка), в координатах пушки. Морда смотрит в −Z.
+const MUZZLE := Vector3(0, 0.74, -0.92)
+
+# В колонках и слотах панда стоит мордой к игроку и чуть откинута назад:
+# камера смотрит почти сверху, и без наклона от морды видна только полоска.
+const LEAN := 0.45
 
 
 func setup(new_color: String, new_ammo: int) -> void:
 	color = new_color
 	ammo = new_ammo
 
-	material = StandardMaterial3D.new()
-	var mat := material
-
-	if body_mesh == null:
-		body_mesh = RoundedBox.make(Vector3(1.9, 1.0, 1.7), 0.35, 3)
-		barrel_mesh = RoundedBox.make(Vector3(0.5, 0.5, 0.6), 0.15, 2)
+	var blob := MeshInstance3D.new()
+	blob.mesh = shadow_blob()
+	blob.material_override = blob_material
+	blob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	blob.position.y = 0.03
+	add_child(blob)
 
 	visual = Node3D.new()
 	add_child(visual)
 
-	var body := MeshInstance3D.new()
-	body.mesh = body_mesh
-	body.layers = SHADOW_LAYER
-	body.material_override = mat
-	body.position.y = 0.6
-	visual.add_child(body)
-
-	var barrel := MeshInstance3D.new()
-	barrel.mesh = barrel_mesh
-	barrel.layers = SHADOW_LAYER
-	barrel.material_override = mat
-	barrel.position = BARREL_POSITION
-	visual.add_child(barrel)
+	var model := MODEL.instantiate()
+	visual.add_child(model)
+	body = model.find_children("*", "MeshInstance3D", true, false)[0]
+	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	label = Label3D.new()
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -69,8 +67,8 @@ func setup(new_color: String, new_ammo: int) -> void:
 	label.font_size = 72
 	label.outline_size = 11
 	label.pixel_size = 0.012
-	# На верхней грани корпуса: камера наклонена, и метка повыше съезжала бы вверх с блока.
-	label.position.y = 1.1
+	# На макушке: камера наклонена, и метка повыше съезжала бы вверх с пушки.
+	label.position.y = 1.6
 	visual.add_child(label)
 	paint()
 
@@ -78,6 +76,15 @@ func setup(new_color: String, new_ammo: int) -> void:
 # Кончик ствола в мировых координатах (учитывает поворот и масштаб стрелка).
 func muzzle_position() -> Vector3:
 	return to_global(MUZZLE)
+
+
+# Повернуться мордой к игроку (в колонке, слоте) или обратно, к полю (на ленте).
+func face_player(on: bool, animated := true) -> void:
+	var lean := LEAN if on else 0.0
+	if not animated:
+		visual.rotation.x = lean
+		return
+	create_tween().tween_property(visual, "rotation:x", lean, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
 # Прыжок при выборе: присел, подскочил, приземлился с лёгким сплющиванием.
@@ -115,11 +122,43 @@ func set_hidden(value: bool, animated: bool) -> void:
 
 func paint() -> void:
 	var c: Color = MYSTERY if hidden else Level.COLORS[color]
-	material.albedo_color = c
+	body.material_override = material_for(c)
 	# Тонкая обводка тёмным оттенком цвета стрелка — мягче, чем чёрная.
 	var alpha := label.outline_modulate.a
 	label.outline_modulate = Color(c.darkened(0.55), alpha)
 	update_label()
+
+
+static func material_for(c: Color) -> StandardMaterial3D:
+	if not materials.has(c):
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = c
+		mat.vertex_color_use_as_albedo = true
+		mat.roughness = 0.35
+		materials[c] = mat
+	return materials[c]
+
+
+# Пятно-тень: квадрат с круглым мягким градиентом, общий на всех панд.
+static func shadow_blob() -> PlaneMesh:
+	if not blob_mesh:
+		blob_mesh = PlaneMesh.new()
+		blob_mesh.size = Vector2(2.1, 2.0)
+		var gradient := Gradient.new()
+		gradient.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+		gradient.colors = PackedColorArray([Color(0, 0, 0, 0.45), Color(0, 0, 0, 0.3), Color(0, 0, 0, 0)])
+		var texture := GradientTexture2D.new()
+		texture.gradient = gradient
+		texture.fill = GradientTexture2D.FILL_RADIAL
+		texture.fill_from = Vector2(0.5, 0.5)
+		texture.fill_to = Vector2(1.0, 0.5)
+		texture.width = 64
+		texture.height = 64
+		blob_material = StandardMaterial3D.new()
+		blob_material.albedo_texture = texture
+		blob_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		blob_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return blob_mesh
 
 
 func set_dimmed(dimmed: bool) -> void:

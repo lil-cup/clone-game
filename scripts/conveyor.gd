@@ -27,7 +27,7 @@ var straight := 0.0   # длина прямого участка
 var arc := 0.0        # длина скругления
 var length := 0.0     # длина всего круга
 var scroll_offset := 0.0
-var chevrons: Array[MeshInstance3D] = []
+var chevrons: MultiMesh  # все ёлочки одним вызовом отрисовки
 
 
 func build(field_size: float, cell_count: int) -> void:
@@ -51,30 +51,27 @@ func build(field_size: float, cell_count: int) -> void:
 	add_strip(-road_width / 2.0, 0.35, 0.45, rail)
 
 
-	chevrons.clear()
-	var mesh := make_chevron_mesh()
-	var mat := plain_material(stripe_color)
+	chevrons = MultiMesh.new()
+	chevrons.transform_format = MultiMesh.TRANSFORM_3D
+	chevrons.mesh = make_chevron_mesh()
 	# Целое число ёлочек на круг: шаг чуть подгоняется под длину ленты.
-	for i in roundi(length / CHEVRON_STEP):
-		var chevron := MeshInstance3D.new()
-		chevron.mesh = mesh
-		chevron.material_override = mat
-		chevron.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(chevron)
-		chevrons.append(chevron)
+	chevrons.instance_count = roundi(length / CHEVRON_STEP)
+	var instance := MultiMeshInstance3D.new()
+	instance.multimesh = chevrons
+	instance.material_override = plain_material(stripe_color)
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(instance)
 	scroll(0.0)
 
 
 # Двигает ёлочки вслед за стрелками.
 func scroll(distance: float) -> void:
 	scroll_offset = fmod(scroll_offset + distance * CHEVRON_SPEED, length)
-	var step := length / chevrons.size()
-	for i in chevrons.size():
+	var step := length / chevrons.instance_count
+	for i in chevrons.instance_count:
 		var d := scroll_offset + i * step
 		var forward := (point(d + 0.05) - point(d - 0.05)).normalized()
-		var chevron := chevrons[i]
-		chevron.basis = Basis(forward, Vector3.UP, forward.cross(Vector3.UP))
-		chevron.position = point(d) + Vector3.UP * 0.01
+		chevrons.set_instance_transform(i, Transform3D(Basis(forward, Vector3.UP, forward.cross(Vector3.UP)), point(d) + Vector3.UP * 0.01))
 
 
 # Плоская «галочка» острием вдоль оси X: два крыла, расходящихся назад.

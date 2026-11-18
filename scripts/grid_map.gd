@@ -52,11 +52,8 @@ func build_level(new_level: Level, field: float) -> void:
 func block_material(color: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
-	# Лёгкий глянец: блики на скруглённых краях.
+	# Лёгкий глянец: блики на скруглённых краях (без clearcoat — на телефонах он дорогой).
 	mat.roughness = 0.3
-	mat.clearcoat_enabled = true
-	mat.clearcoat = 0.7
-	mat.clearcoat_roughness = 0.15
 	return mat
 
 

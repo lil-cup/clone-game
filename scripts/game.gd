@@ -85,6 +85,8 @@ func _ready() -> void:
 			add_child(s)
 			s.scale = Vector3.ONE * BIG
 			s.setup(item.color, item.ammo)
+			s.rotation.y = PI  # мордой к игроку
+			s.face_player(true, false)
 			s.hideable = item.hide
 			s.column = c
 			columns[c].append(s)
@@ -246,7 +248,8 @@ func try_enter() -> void:
 	layout_pending()
 
 	var t := move(s, conveyor.point(0.0))
-	t.parallel().tween_property(s, "rotation:y", rotation_towards(conveyor.inward(0.0)), MOVE_TIME)
+	t.parallel().tween_property(s, "rotation:y", nearest_turn(s.rotation.y, rotation_towards(conveyor.inward(0.0))), MOVE_TIME)
+	s.face_player(false)
 	t.parallel().tween_property(s, "scale", Vector3.ONE, MOVE_TIME)
 	t.tween_callback(func():
 		entering -= 1
@@ -363,7 +366,8 @@ func finish_lap(s: Shooter) -> void:
 	s.slot = i
 	s.state = Shooter.State.MOVING
 	var t := move(s, slot_position(i))
-	t.parallel().tween_property(s, "rotation:y", 0.0, MOVE_TIME)
+	t.parallel().tween_property(s, "rotation:y", nearest_turn(s.rotation.y, PI), MOVE_TIME)
+	s.face_player(true)
 	t.parallel().tween_property(s, "scale", Vector3.ONE * BIG, MOVE_TIME)
 	t.tween_callback(func():
 		s.state = Shooter.State.IN_SLOT
@@ -433,7 +437,8 @@ func link(a: Shooter, b: Shooter) -> void:
 	for i in LINK_SEGMENTS:
 		var owner := a if i < LINK_SEGMENTS / 2 else b
 		parts.append(link_piece(link_cylinder, owner))
-	for i in LINK_SEGMENTS + 1:
+	# Шарики только на внутренних стыках: концы дуги и так спрятаны в пандах.
+	for i in range(1, LINK_SEGMENTS):
 		var owner := a if i <= LINK_SEGMENTS / 2 else b
 		joints.append(link_piece(link_sphere, owner))
 	links.append({"a": a, "b": b, "parts": parts, "joints": joints})
@@ -488,8 +493,8 @@ func update_links() -> void:
 			points.append(from.lerp(top, t).lerp(top.lerp(to, t), t))
 		for i in LINK_SEGMENTS:
 			place_tube(l.parts[i], points[i], points[i + 1], radius)
-		for i in LINK_SEGMENTS + 1:
-			l.joints[i].transform = Transform3D(Basis.from_scale(Vector3.ONE * radius), points[i])
+		for i in range(1, LINK_SEGMENTS):
+			l.joints[i - 1].transform = Transform3D(Basis.from_scale(Vector3.ONE * radius), points[i])
 
 
 # Цилиндр от p до q: единичный меш, растянутый по длине и толщине.
@@ -554,6 +559,11 @@ func move(s: Shooter, to: Vector3) -> Tween:
 	var t := create_tween()
 	t.tween_property(s, "position", to, MOVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	return t
+
+
+# Тот же угол, что target, но ближайший к from — чтобы поворот шёл коротким путём, а не через полкруга.
+func nearest_turn(from: float, target: float) -> float:
+	return from + wrapf(target - from, -PI, PI)
 
 
 func rotation_towards(dir: Vector3) -> float:
