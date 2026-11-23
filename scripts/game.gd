@@ -725,19 +725,6 @@ func make_hud() -> void:
 	var title := UI.label("Уровень %d" % (level_index + 1), 40)
 	title.add_theme_color_override("font_color", HUD_TEXT)
 	header.add_child(title)
-	# Тройное нажатие на заголовок показывает счётчик кадров — проверять плавность на телефоне.
-	var meter := FpsMeter.make()
-	hud.add_child(meter)
-	var taps: Array[float] = []
-	title.mouse_filter = Control.MOUSE_FILTER_STOP
-	title.gui_input.connect(func(event: InputEvent):
-		if event is InputEventMouseButton and event.pressed:
-			var now := Time.get_ticks_msec() / 1000.0
-			taps.append(now)
-			taps = taps.filter(func(t): return now - t < 1.0)
-			if taps.size() >= 3:
-				taps.clear()
-				meter.visible = not meter.visible)
 	var info := UI.label("%s · сложность %d" % [level.name, level.difficulty + 1], 24)
 	info.add_theme_color_override("font_color", HUD_TEXT)
 	info.modulate = Color(1, 1, 1, 0.7)
