@@ -21,14 +21,17 @@ var history := PackedFloat32Array()
 var head := 0  # куда писать следующий кадр в history (кольцевой буфер)
 var mode := 0
 
-# Первый — как в игре сейчас (scaling_3d/scale.web и msaa_3d из настроек проекта).
+# Варианты качества для проверки на телефоне. scale = 0 — как выставила игра
+# (Game.fit_3d_resolution), msaa = -1 — как в настройках проекта.
 const MODES := [
-	{name = "как есть", scale = 0.75, msaa = Viewport.MSAA_2X, fps = 0},
-	{name = "3D 50%", scale = 0.5, msaa = Viewport.MSAA_2X, fps = 0},
-	{name = "без сглаживания", scale = 0.75, msaa = Viewport.MSAA_DISABLED, fps = 0},
-	{name = "3D 50%, без сглаж.", scale = 0.5, msaa = Viewport.MSAA_DISABLED, fps = 0},
-	{name = "30 FPS", scale = 0.75, msaa = Viewport.MSAA_2X, fps = 30},
+	{name = "как в игре", scale = 0.0, msaa = -1, fps = 0},
+	{name = "3D 75%", scale = 0.75, msaa = -1, fps = 0},
+	{name = "3D 50%", scale = 0.5, msaa = -1, fps = 0},
+	{name = "без сглаживания", scale = 0.0, msaa = Viewport.MSAA_DISABLED, fps = 0},
+	{name = "30 FPS", scale = 0.0, msaa = -1, fps = 30},
 ]
+var game_scale := 0.0
+var game_msaa := Viewport.MSAA_DISABLED
 
 
 static func make() -> FpsMeter:
@@ -57,8 +60,8 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	if elapsed >= 0.5:
 		var window := get_window().size
-		text = "%d FPS\nкадр %d–%d мс\n%s\nэкран %d×%d" % [roundi(frames / elapsed), roundi(best * 1000.0),
-				roundi(worst * 1000.0), MODES[mode].name, window.x, window.y]
+		text = "%d FPS\nкадр %d–%d мс\n%s, 3D %d%%\nэкран %d×%d" % [roundi(frames / elapsed), roundi(best * 1000.0),
+				roundi(worst * 1000.0), MODES[mode].name, roundi(get_viewport().scaling_3d_scale * 100.0), window.x, window.y]
 		frames = 0
 		worst = 0.0
 		best = 1.0
@@ -70,10 +73,14 @@ func _process(delta: float) -> void:
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		mode = (mode + 1) % MODES.size()
-		var m: Dictionary = MODES[mode]
 		var viewport := get_viewport()
-		viewport.scaling_3d_scale = m.scale
-		viewport.msaa_3d = m.msaa
+		if mode == 1:
+			# Запоминаем, что выставила игра, при первом уходе с «как в игре».
+			game_scale = viewport.scaling_3d_scale
+			game_msaa = viewport.msaa_3d
+		var m: Dictionary = MODES[mode]
+		viewport.scaling_3d_scale = m.scale if m.scale > 0.0 else game_scale
+		viewport.msaa_3d = m.msaa if m.msaa >= 0 else game_msaa
 		Engine.max_fps = m.fps
 		accept_event()
 

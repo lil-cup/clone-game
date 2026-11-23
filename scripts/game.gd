@@ -18,6 +18,7 @@ const SLOT_COLOR := Color("2a2942")
 const HUD_TEXT := Color.WHITE
 const HIDDEN_FROM := 1       # уровень (с нуля), где впервые появляются скрытые стрелки
 const BOOSTERS_FROM := 2     # с какого уровня (с нуля) видна панель бустеров
+const WEB_3D_WIDTH := 600.0  # сколько точек по ширине рисуется 3D в браузере (см. fit_3d_resolution)
 
 static var level_index := 0
 
@@ -69,6 +70,9 @@ func _ready() -> void:
 	bullet_mesh.radial_segments = 12
 	bullet_mesh.rings = 6
 	piece_mesh = RoundedBox.make(grid.BLOCK_SIZE, grid.BLOCK_RADIUS, 1)
+	if OS.has_feature("web"):
+		fit_3d_resolution()
+		get_window().size_changed.connect(fit_3d_resolution)
 	slots.resize(Level.SLOTS)
 	grid.build_level(level, FIELD)
 	conveyor.build(FIELD, level.size)
@@ -155,6 +159,14 @@ func steady_delta(delta: float) -> float:
 	# подвисание сильно его не сдвигает.
 	frame_time = lerpf(frame_time, minf(delta, 0.1), 0.05)
 	return delta if hitch else frame_time
+
+
+# На айфоне (экран 1170 точек в ширину) 3D в 75% разрешения видеокарта не успевала
+# дорисовывать: FPS ровные 60, а пушки на ленте ехали рывками — часть кадров не доходила
+# до экрана. При ~600 точках по ширине всё плавно. Долю считаем от экрана, а не ставим
+# 50% всем: на экранах попроще картинка была бы мыльной без нужды.
+func fit_3d_resolution() -> void:
+	get_viewport().scaling_3d_scale = clampf(WEB_3D_WIDTH / get_window().size.x, 0.5, 1.0)
 
 
 func _unhandled_input(event: InputEvent) -> void:
