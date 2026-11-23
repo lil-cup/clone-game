@@ -10,8 +10,10 @@ const LEVEL_REWARD := 40
 
 # Жизни: проигрыш или выход из уровня стоит одной, без жизней играть нельзя.
 const MAX_LIVES := 5
-const LIFE_SECONDS := 15 * 60  # за сколько восстанавливается одна жизнь
+const LIFE_SECONDS := 24 * 60 * 60  # за сколько восстанавливается одна жизнь (сутки)
 const FREE_LEVELS := 10        # на стольких первых уровнях жизни бесконечные
+const LIFE_PRICE := 800        # жизнь можно купить за монеты
+const BOOSTER_PRICE := 400     # любой бустер тоже
 
 
 # Сколько уровней пройдено. Он же — номер (с нуля) единственного открытого уровня.
@@ -52,6 +54,15 @@ static func use_booster(id: String) -> void:
 	write(booster_key("boosters", id), maxi(boosters(id) - 1, 0))
 
 
+# Купить один бустер за монеты. false — монет не хватает.
+static func buy_booster(id: String) -> bool:
+	if coins() < BOOSTER_PRICE:
+		return false
+	write("coins", coins() - BOOSTER_PRICE)
+	write(booster_key("boosters", id), boosters(id) + 1)
+	return true
+
+
 static func booster_gift_taken(id: String) -> bool:
 	return read(booster_key("booster_gift", id)) == 1
 
@@ -82,6 +93,18 @@ static func lose_life(level_index: int) -> void:
 	write("lives_lost", mini(lost + 1, MAX_LIVES))
 
 
+# Купить одну жизнь за монеты. false — жизни и так полные или монет не хватает.
+# Таймер следующей жизни не сбрасывается: купленная жизнь не отнимает накопленное время.
+static func buy_life() -> bool:
+	refill()
+	var lost := read("lives_lost")
+	if lost == 0 or coins() < LIFE_PRICE:
+		return false
+	write("coins", coins() - LIFE_PRICE)
+	write("lives_lost", lost - 1)
+	return true
+
+
 # Через сколько секунд появится следующая жизнь (0 — жизни полные).
 static func next_life_in() -> int:
 	refill()
@@ -101,6 +124,11 @@ static func refill() -> void:
 		return
 	write("lives_lost", maxi(lost - gained, 0))
 	write("lives_since", since + gained * LIFE_SECONDS)
+
+
+# Время до следующей жизни: «23:59:59». Жизнь копится сутки, минут:секунд не хватает.
+static func format_wait(seconds: int) -> String:
+	return "%d:%02d:%02d" % [seconds / 3600, seconds / 60 % 60, seconds % 60]
 
 
 static func now() -> int:

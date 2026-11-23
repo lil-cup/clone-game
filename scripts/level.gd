@@ -3,23 +3,34 @@ extends RefCounted
 
 # Цвета блоков и стрелков. Буква в карте уровня -> цвет.
 # Должны совпадать с PALETTE в tools/make_levels.py.
+# Мягкие яркие цвета: не чистые «кричащие» основные, а оттенки поприятнее
+# (голубой вместо синего, малиново-бордовый вместо красного), но пары, которые встречаются
+# рядом на картинках (зелёный/тёмно-зелёный, бордовый/розовый/коричневый, жёлтый/бежевый),
+# по-прежнему хорошо различимы. Фиолетовый уведён в сторону пурпурного, чтобы не путать
+# со скрытыми пушками (Shooter.MYSTERY).
 const COLORS := {
-	"R": Color("e8202a"),
-	"W": Color("ffffff"),
-	"Y": Color("ffd400"),
-	"G": Color("22b53a"),
-	"B": Color("1f8fff"),
-	"P": Color("7a3cf0"),
-	"O": Color("ff7a00"),
-	"K": Color("7a4520"),
-	"N": Color("1b1b2b"),
-	"D": Color("0f6b2c"),
-	"S": Color("ff6fb5"),
-	"A": Color("9aa3b8"),
-	"L": Color("f7c48a"),
+	"R": Color("d23a55"),  # малиново-бордовый
+	"W": Color("fbf7ee"),  # тёплый белый
+	"Y": Color("ffd43b"),  # солнечно-жёлтый
+	"G": Color("4cc66a"),  # травяной
+	"B": Color("45aef5"),  # голубой
+	"P": Color("a457e0"),  # виноградный
+	"O": Color("ff8a3d"),  # мандариновый
+	"K": Color("9a5a36"),  # шоколадный
+	"N": Color("1c1b2e"),  # почти чёрный (контуры)
+	"D": Color("1f8048"),  # хвойный
+	"S": Color("ff8fc4"),  # розовый
+	"A": Color("a7b2c6"),  # серо-голубой
+	"L": Color("ffcf9e"),  # персиковый
 }
 
-const LEVELS_PER_DIFFICULTY := 10
+# Обучение (уровни 1–4, см. INTRO_TWISTS) всегда обычное. После него уровни идут циклами
+# по 9: семь обычных, потом «сложный» и сразу за ним «очень сложный» — 12 и 13, 21 и 22…
+const CYCLE := 9
+const HARD_AT := 7  # место сложного в цикле (с нуля), очень сложный — следующий
+const DIFFICULTY_NAMES := ["Обычный", "Сложный", "Очень сложный"]
+const HARD_LINKS := [0, 2, 4]       # сколько пар добавить к обычному набору (см. twist())
+const HARD_HIDDEN := [0.0, 0.5, 0.8]  # не меньше такой доли скрытых
 
 const COLUMNS := 4
 
@@ -53,7 +64,8 @@ const SLOTS := 5
 # а в картах каждого цвета хотя бы столько блоков (tools/make_levels.py).
 const MIN_AMMO := 10
 
-# Сложность меняется каждые 10 уровней. Размер поля задаётся в tools/make_levels.py.
+# Настройки по сложности уровня: обычный, сложный, очень сложный (см. CYCLE).
+# Размер поля задаётся в tools/make_levels.py.
 # caps    — сколько патронов может быть у стрелка (больше = чаще возвращается в слот, сложнее)
 # spread  — насколько «неоптимальные» цвета допускаются: 1.0 = всегда лучший цвет, 0.3 = почти любой
 # shuffle — 0: колонки идут строго в порядке решения, 1: стрелки раскиданы по колонкам случайно
@@ -63,7 +75,7 @@ const MIN_AMMO := 10
 const DIFFICULTIES := [
 	{"caps": [20, 30, 40], "spread": 0.4, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.15},
 	{"caps": [25, 40, 50], "spread": 0.25, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.03},
-	{"caps": [30, 45, 60], "spread": 0.15, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.01},
+	{"caps": [40, 60, 80], "spread": 0.1, "shuffle": 1.0, "min_ammo": MIN_AMMO, "target": 0.01},
 ]
 
 var index := 0
@@ -85,14 +97,21 @@ static func seed_for(index: int) -> int:
 	return 1000 + index
 
 
+# 0 — обычный, 1 — сложный, 2 — очень сложный.
+static func difficulty_of(index: int) -> int:
+	if index < INTRO_TWISTS.size():
+		return 0
+	return clampi((index - INTRO_TWISTS.size()) % CYCLE - HARD_AT + 1, 0, 2)
+
+
 static func load_map(index: int) -> Level:
 	var level := Level.new()
 	var data: Dictionary = Levels.LIST[index]
 	var map: Array = data.map
 	level.name = data.name
 	level.index = index
-	level.difficulty = index / LEVELS_PER_DIFFICULTY
-	level.settings = DIFFICULTIES[mini(level.difficulty, DIFFICULTIES.size() - 1)]
+	level.difficulty = difficulty_of(index)
+	level.settings = DIFFICULTIES[level.difficulty]
 	level.size = map.size()
 	for row in level.size:
 		var line: String = map[row]
@@ -320,6 +339,11 @@ func twist() -> Dictionary:
 	var t: Dictionary = TWISTS[k % TWISTS.size()].duplicate()
 	if t.links > 0:
 		t.links += k / 10
+	# Сложные уровни трудны прежде всего особенностями: пары сильно связывают ходы,
+	# а скрытые не дают спланировать. Одни только запасы патронов почти не усложняли
+	# (проверено калибровкой: бот наугад всё равно выигрывал 8–17%).
+	t.links += HARD_LINKS[difficulty]
+	t.hidden = maxf(t.hidden, HARD_HIDDEN[difficulty])
 	return t
 
 

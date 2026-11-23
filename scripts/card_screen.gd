@@ -37,6 +37,26 @@ static func booster_gift(id: String, claimed: Callable) -> CardScreen:
 	return screen
 
 
+# «Ещё бустер»: бустеры кончились — можно взять ещё за монеты.
+# Если монет не хватает, вместо покупки кнопка просто закрывает карточку.
+static func buy_booster(id: String, bought: Callable, cancelled: Callable) -> CardScreen:
+	var screen := CardScreen.new()
+	screen.title_text = "Ещё бустер"
+	var coins := Progress.coins()
+	if coins >= Progress.BOOSTER_PRICE:
+		screen.caption_text = BoosterBar.caption(id)
+		screen.button_text = "За %d" % Progress.BOOSTER_PRICE
+		screen.on_ok = bought
+	else:
+		screen.caption_text = "Нужно %d монет,\nа у тебя %d" % [Progress.BOOSTER_PRICE, coins]
+		screen.button_text = "Понятно"
+		screen.on_ok = cancelled
+	screen.painter = func(c: CanvasItem): BoosterBar.draw_icon(id, c, Vector2.ZERO, 92.0)
+	screen.on_cancel = cancelled
+	screen.build()
+	return screen
+
+
 # «Вы уверены?»: выход из уровня стоит жизни.
 static func lose_life(action: String, confirmed: Callable, cancelled: Callable) -> CardScreen:
 	var screen := CardScreen.new()

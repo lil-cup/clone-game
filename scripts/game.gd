@@ -725,7 +725,8 @@ func make_hud() -> void:
 	var title := UI.label("Уровень %d" % (level_index + 1), 40)
 	title.add_theme_color_override("font_color", HUD_TEXT)
 	header.add_child(title)
-	var info := UI.label("%s · сложность %d" % [level.name, level.difficulty + 1], 24)
+	var info := UI.label(level.name if level.difficulty == 0
+			else "%s · %s" % [level.name, Level.DIFFICULTY_NAMES[level.difficulty].to_lower()], 24)
 	info.add_theme_color_override("font_color", HUD_TEXT)
 	info.modulate = Color(1, 1, 1, 0.7)
 	header.add_child(info)

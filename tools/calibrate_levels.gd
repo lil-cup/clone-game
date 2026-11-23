@@ -22,7 +22,9 @@ func _initialize() -> void:
 		var tried := 0
 		var k := 0
 		# Сиды, где у кого-то меньше Level.MIN_AMMO патронов, не годятся; если таких много — ищем дальше.
-		while tried < SEEDS_TO_TRY and k < SEEDS_TO_TRY * 10:
+		# Трудную раскладку найти сложнее: у сложных уровней перебираем больше вариантов.
+		var to_try := SEEDS_TO_TRY * (1 + level.difficulty * 3)
+		while tried < to_try and k < to_try * 10:
 			var level_seed := 1000 + index * 100 + k
 			k += 1
 			if not ammo_ok(level, level_seed):

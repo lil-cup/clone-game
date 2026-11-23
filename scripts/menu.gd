@@ -17,8 +17,8 @@ const CURRENT_SIZE := 190.0
 const STEP := 210.0       # расстояние между уровнями по вертикали
 const AHEAD := 3          # сколько следующих уровней видно
 const CURRENT_AT := 0.78  # высота текущего уровня (доля высоты дорожки сверху)
-const DIFFICULTY_NAMES := ["Легко", "Средне", "Сложно"]
-const DIFFICULTY_COLORS := [Color("2f80ff"), Color("ff8a1f"), Color("8b3ff0")]
+# Все обычные уровни одного цвета, выделяются только сложный и очень сложный (Level.CYCLE).
+const DIFFICULTY_COLORS := [Color("2f80ff"), Color("8b3ff0"), Color("e5394f")]
 const SETTINGS_COLOR := Color("17357a")
 const COIN_DROPS := 15    # на сколько монеток делится награда, пока летит в счётчик
 const COIN_GAP := 0.085   # пауза между монетками в очереди, секунд
@@ -79,10 +79,10 @@ func _ready() -> void:
 			var b := make_level_button(i)
 			map.add_child(b)
 			buttons.append(b)
-		# На лёгких уровнях плашку не показываем — подписываем только «Средне» и «Сложно».
+		# На обычных уровнях плашку не показываем — подписываем только сложные.
 		var difficulty := difficulty_of(completed)
 		if difficulty > 0:
-			badge = make_badge(DIFFICULTY_NAMES[difficulty], DIFFICULTY_COLORS[difficulty])
+			badge = make_badge(Level.DIFFICULTY_NAMES[difficulty], DIFFICULTY_COLORS[difficulty])
 			map.add_child(badge)
 
 		var play := UI.button("Играть", PLAY, start.bind(completed), Vector2(400, 124), 64, 34)
@@ -133,7 +133,7 @@ func _ready() -> void:
 
 
 func difficulty_of(i: int) -> int:
-	return mini(Level.load_map(i).difficulty, DIFFICULTY_NAMES.size() - 1)
+	return Level.difficulty_of(i)
 
 
 func radial_gradient() -> GradientTexture2D:
@@ -298,6 +298,12 @@ func make_lives_counter() -> PanelContainer:
 	lives_label.custom_minimum_size.x = 100
 	row.add_child(lives_label)
 	update_lives()
+	# Нажатие на счётчик предлагает купить жизнь.
+	panel.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			if not Progress.lives_infinite() and Progress.lives() < Progress.MAX_LIVES:
+				UI.play_click(self)
+				offer_life())
 	return panel
 
 
@@ -333,7 +339,7 @@ func update_lives() -> void:
 		lives_shown = lives
 		lives_heart.queue_redraw()
 	var wait := Progress.next_life_in()
-	lives_label.text = "Макс" if lives >= Progress.MAX_LIVES else "%d:%02d" % [wait / 60, wait % 60]
+	lives_label.text = "Макс" if lives >= Progress.MAX_LIVES else Progress.format_wait(wait)
 
 
 # Таймер жизней обновляем раз в полсекунды: каждое обновление читает сохранение с диска.
@@ -513,12 +519,33 @@ func reset_progress() -> void:
 	get_tree().reload_current_scene()
 
 
+# Карточка покупки жизни. after — что сделать после покупки (из «Нет жизней» — сразу играть).
+func offer_life(title := "Ещё жизнь", after := Callable()) -> void:
+	var text := "Новая жизнь через " + Progress.format_wait(Progress.next_life_in())
+	var actions := []
+	if Progress.coins() >= Progress.LIFE_PRICE:
+		actions.append(["Купить за %d" % Progress.LIFE_PRICE, UI.GREEN, buy_life.bind(after)])
+	else:
+		text += "\nили купи за %d монет —\nпока их %d" % [Progress.LIFE_PRICE, Progress.coins()]
+	actions.append(["Назад", UI.PURPLE, settings_panel.hide])
+	show_settings_card(title, text, actions)
+
+
+func buy_life(after: Callable) -> void:
+	if not Progress.buy_life():
+		return
+	# Монеты списываем и в счётчике (он может отставать от сохранения, пока «капают» новые).
+	coins_shown -= Progress.LIFE_PRICE
+	coins_label.text = str(coins_shown)
+	update_lives()
+	settings_panel.hide()
+	if after.is_valid():
+		after.call()
+
+
 func start(i: int) -> void:
 	if i >= Progress.FREE_LEVELS and Progress.lives() <= 0:
-		var wait := Progress.next_life_in()
-		show_settings_card("Нет жизней", "Новая жизнь через %d:%02d" % [wait / 60, wait % 60], [
-			["Назад", UI.PURPLE, settings_panel.hide],
-		])
+		offer_life("Нет жизней", start.bind(i))
 		return
 	Game.level_index = i
 	get_tree().change_scene_to_file("res://scenes/game.tscn")

@@ -3,7 +3,7 @@ extends HBoxContainer
 
 # Панель бустеров внизу экрана игры (появляется с Game.BOOSTERS_FROM-го уровня).
 # Каждый бустер открывается со своего уровня, до этого его ячейка под замком.
-# За уровень каждый бустер можно применить один раз.
+# За уровень каждый бустер можно применить один раз. Кончились — можно купить (Progress.BOOSTER_PRICE).
 
 const COLOR := Color("2f8ff0")
 const LOCKED := Color("3a3f6b")
@@ -159,8 +159,11 @@ func center_of(id: String) -> Vector2:
 
 func use(id: String) -> void:
 	var b := button_of(id)
-	if game.finished or used.has(id) or Progress.boosters(id) <= 0:
+	if game.finished or used.has(id):
 		shake(b)
+		return
+	if Progress.boosters(id) <= 0:
+		offer(id)
 		return
 	match id:
 		"slot":
@@ -175,6 +178,16 @@ func use(id: String) -> void:
 				game.stop_picking()
 			else:
 				game.start_picking()
+
+
+# Бустеров этого вида нет — предлагаем купить; купленный сразу применяется.
+func offer(id: String) -> void:
+	game.get_tree().paused = true
+	game.hud.add_child(CardScreen.buy_booster(id, func():
+		game.get_tree().paused = false
+		if Progress.buy_booster(id):
+			refresh()
+			use(id), func(): game.get_tree().paused = false))
 
 
 func spend(id: String) -> void:
