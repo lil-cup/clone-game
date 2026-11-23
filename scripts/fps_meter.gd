@@ -6,6 +6,8 @@ extends Label
 # движение пушек выглядит рывками.
 # Под цифрами — график времени последних кадров: средний FPS прячет неровность,
 # а по графику видно, идут ли кадры ровно (гладкая линия) или вразнобой (пила).
+# Нажатие на счётчик переключает качество картинки: кадры могут идти ровно, а телефон
+# не успевает их дорисовать и показывает рывками — так на месте видно, что помогает.
 
 const HISTORY := 120          # сколько последних кадров на графике (~2 с)
 const GRAPH_SIZE := Vector2(240, 90)
@@ -17,6 +19,16 @@ var best := 1.0
 var elapsed := 0.0
 var history := PackedFloat32Array()
 var head := 0  # куда писать следующий кадр в history (кольцевой буфер)
+var mode := 0
+
+# Первый — как в игре сейчас (scaling_3d/scale.web и msaa_3d из настроек проекта).
+const MODES := [
+	{name = "как есть", scale = 0.75, msaa = Viewport.MSAA_2X, fps = 0},
+	{name = "3D 50%", scale = 0.5, msaa = Viewport.MSAA_2X, fps = 0},
+	{name = "без сглаживания", scale = 0.75, msaa = Viewport.MSAA_DISABLED, fps = 0},
+	{name = "3D 50%, без сглаж.", scale = 0.5, msaa = Viewport.MSAA_DISABLED, fps = 0},
+	{name = "30 FPS", scale = 0.75, msaa = Viewport.MSAA_2X, fps = 30},
+]
 
 
 static func make() -> FpsMeter:
@@ -30,7 +42,7 @@ static func make() -> FpsMeter:
 	meter.grow_horizontal = GROW_DIRECTION_BEGIN
 	meter.position += Vector2(-20, 120)
 	meter.process_mode = PROCESS_MODE_ALWAYS
-	meter.mouse_filter = MOUSE_FILTER_IGNORE
+	meter.mouse_filter = MOUSE_FILTER_STOP
 	meter.history.resize(HISTORY)
 	meter.hide()
 	return meter
@@ -44,13 +56,26 @@ func _process(delta: float) -> void:
 	best = minf(best, delta)
 	elapsed += delta
 	if elapsed >= 0.5:
-		text = "%d FPS\nкадр %d–%d мс" % [roundi(frames / elapsed), roundi(best * 1000.0), roundi(worst * 1000.0)]
+		var window := get_window().size
+		text = "%d FPS\nкадр %d–%d мс\n%s\nэкран %d×%d" % [roundi(frames / elapsed), roundi(best * 1000.0),
+				roundi(worst * 1000.0), MODES[mode].name, window.x, window.y]
 		frames = 0
 		worst = 0.0
 		best = 1.0
 		elapsed = 0.0
 	if visible:
 		queue_redraw()
+
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		mode = (mode + 1) % MODES.size()
+		var m: Dictionary = MODES[mode]
+		var viewport := get_viewport()
+		viewport.scaling_3d_scale = m.scale
+		viewport.msaa_3d = m.msaa
+		Engine.max_fps = m.fps
+		accept_event()
 
 
 func _draw() -> void:
