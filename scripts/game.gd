@@ -35,6 +35,7 @@ var last_entry := -100.0
 var finished := false
 var reward_claimed := false
 var belt_speed := SPEED
+var frame_time := 1.0 / 60.0  # сглаженное время кадра для движения ленты (см. steady_delta)
 var link_cylinder: CylinderMesh
 var link_sphere: SphereMesh
 var links: Array[Dictionary] = []  # {a, b, tube} — связанные пары в колонках
@@ -134,6 +135,7 @@ func _process(delta: float) -> void:
 	update_links()
 	if finished:
 		return
+	delta = steady_delta(delta)
 	var target := SPEED * ENDGAME_BOOST if endgame() else SPEED
 	belt_speed = move_toward(belt_speed, target, ACCELERATION * delta)
 	conveyor.scroll(belt_speed * delta)
@@ -141,6 +143,18 @@ func _process(delta: float) -> void:
 	for s in belt.duplicate():
 		move_on_belt(s, delta)
 	update_belt_label()
+
+
+# В браузере кадры выводятся ровно, но delta между ними скачет (12, 21, 16 мс…): время
+# меряется не по моменту показа кадра. Пушки на быстрой ленте проезжали то больше, то меньше
+# и дёргались при нормальном FPS. Берём среднее время кадра, а настоящий delta — только
+# при явном подвисании, чтобы лента не отставала от часов.
+func steady_delta(delta: float) -> float:
+	var hitch := delta > frame_time * 1.8
+	# Среднее подстраивается и под долгие кадры (телефон перешёл на 30 FPS), но одно
+	# подвисание сильно его не сдвигает.
+	frame_time = lerpf(frame_time, minf(delta, 0.1), 0.05)
+	return delta if hitch else frame_time
 
 
 func _unhandled_input(event: InputEvent) -> void:
