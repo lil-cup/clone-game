@@ -33,6 +33,8 @@ var pending: Array[Shooter] = []
 var belt: Array[Shooter] = []
 var entering := 0
 var last_entry := -100.0
+var belt_clock := 0.0  # игровое время ленты: интервал между въездами считаем по нему, а не по часам
+var paired_entry: Shooter  # вторая из пары: заезжает сразу за первой, место для неё уже свободно
 var finished := false
 var reward_claimed := false
 var belt_speed := SPEED
@@ -140,6 +142,7 @@ func _process(delta: float) -> void:
 	if finished:
 		return
 	delta = steady_delta(delta)
+	belt_clock += delta
 	var target := SPEED * ENDGAME_BOOST if endgame() else SPEED
 	belt_speed = move_toward(belt_speed, target, ACCELERATION * delta)
 	conveyor.scroll(belt_speed * delta)
@@ -261,15 +264,24 @@ func launch(s: Shooter) -> void:
 func try_enter() -> void:
 	if pending.is_empty():
 		return
-	var now := Time.get_ticks_msec() / 1000.0
+	var now := belt_clock
 	if now - last_entry < SPACING / belt_speed:
 		return
-	# Не заезжаем, если кто-то заканчивает круг прямо у въезда.
-	for b in belt:
-		if b.distance > conveyor.length - SPACING - belt_speed * MOVE_TIME:
-			return
+	var s: Shooter = pending.front()
+	# Пара заезжает подряд: у въезда нужно место сразу на двоих, иначе пока вторая ждёт,
+	# между ними проскакивает пушка, едущая на новый круг.
+	var pair_next := s.partner != null and pending.size() > 1 and pending[1] == s.partner
+	if s != paired_entry:
+		# Не заезжаем, если кто-то заканчивает круг прямо у въезда.
+		var room := SPACING + belt_speed * MOVE_TIME
+		if pair_next:
+			room = (SPACING + belt_speed * MOVE_TIME) * 2.0
+		for b in belt:
+			if b.distance > conveyor.length - room:
+				return
+	paired_entry = s.partner if pair_next else null
 
-	var s: Shooter = pending.pop_front()
+	pending.pop_front()
 	last_entry = now
 	entering += 1
 	s.state = Shooter.State.MOVING
@@ -326,7 +338,9 @@ func move_on_belt(s: Shooter, delta: float) -> void:
 		left -= step
 		s.distance += step
 		if s.distance >= conveyor.length:
-			if columns_empty() or endgame():
+			# Напарница уже ушла в слот — едем за ней, а не на новый круг: иначе пара разорвана,
+			# ту, что в слоте, не отправить без напарницы, и уровень застревал навсегда.
+			if (columns_empty() or endgame()) and not partner_parked(s):
 				s.distance -= conveyor.length  # последние стрелки — едет ещё круг, а не в слот
 			else:
 				finish_lap(s)
@@ -382,6 +396,10 @@ func vanish(s: Shooter) -> void:
 	var t := create_tween()
 	t.tween_property(s, "scale", Vector3.ZERO, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	t.tween_callback(s.queue_free)
+
+
+func partner_parked(s: Shooter) -> bool:
+	return s.partner != null and s.partner.slot >= 0
 
 
 func finish_lap(s: Shooter) -> void:
