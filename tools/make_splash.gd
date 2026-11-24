@@ -14,6 +14,9 @@ extends SceneTree
 # под название, по бокам — небо и блоки для широкого экрана.
 
 const SIZE := Vector2i(2600, 1400)
+# Рендерим вдвое крупнее и уменьшаем: блики и подсветка по краям шаров и панд мерцали
+# рваными точками, MSAA с этим не справляется, а усреднение 2×2 даёт чистые края.
+const SUPERSAMPLE := 2
 const OUT := "res://splash.png"
 const SHELL_TEMPLATE := "res://web/shell_template.html"
 const SHELL := "res://web/shell.html"
@@ -35,7 +38,7 @@ func _initialize() -> void:
 	rng.seed = 3
 	# Снимаем через SubViewport: окно такого размера система может и не дать.
 	var viewport := SubViewport.new()
-	viewport.size = SIZE
+	viewport.size = SIZE * SUPERSAMPLE
 	viewport.msaa_3d = Viewport.MSAA_4X
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	root.add_child(viewport)
@@ -47,6 +50,7 @@ func _initialize() -> void:
 	for i in 8:
 		await process_frame
 	var img := viewport.get_texture().get_image()
+	img.resize(SIZE.x, SIZE.y, Image.INTERPOLATE_LANCZOS)
 	img.save_png(ProjectSettings.globalize_path(OUT))
 	print("written ", OUT, " ", img.get_size())
 	var webp := img.save_webp_to_buffer(true, WEBP_QUALITY)
@@ -90,6 +94,7 @@ func build(scene: Node3D) -> void:
 	var rim := DirectionalLight3D.new()
 	rim.light_color = Color("fff8ec")
 	rim.light_energy = 0.7
+	rim.light_specular = 0.0  # блик сзади давал резкую белую кромку по краю шаров и панд
 	rim.rotation_degrees = Vector3(-25, 160, 0)
 	scene.add_child(rim)
 
@@ -97,7 +102,7 @@ func build(scene: Node3D) -> void:
 	camera.fov = 50
 	# Камера ниже сцены и смотрит вверх на её середину: горизонт неба (он на уровне
 	# глаз камеры) уходит вниз — неба больше.
-	camera.position = Vector3(0, -3.5, 14)
+	camera.position = CAMERA_POS
 	camera.rotation_degrees.x = 14
 	# Ближние блоки и дальний холм размыты, резкие только панды.
 	var focus := CameraAttributesPractical.new()
@@ -174,7 +179,8 @@ const TITLE_WIDTH := 560.0  # не шире середины, которая о�
 # блик сверху — как кнопки в игре. Чуть наклонено, чтобы не было скучно.
 func make_title() -> Node2D:
 	var title := Node2D.new()
-	title.position = Vector2(SIZE.x / 2.0, 230)
+	title.position = Vector2(SIZE.x / 2.0, 230) * SUPERSAMPLE
+	title.scale = Vector2.ONE * SUPERSAMPLE
 	title.rotation = deg_to_rad(-4)
 	title.draw.connect(func():
 		draw_word(title, "ПАНДА", Vector2(0, 0), Color("ffffff"), Color("bfe6ff"))
@@ -387,7 +393,13 @@ func add_rays(scene: Node3D) -> void:
 		scene.add_child(ray)
 
 
-# Снаряд и шлейф за ним: светлая полоса, сужающаяся и тающая к хвосту.
+# Снаряд и шлейф за ним: одна сплошная белая дымка — у снаряда широкая и плотная,
+# к хвосту сужается и тает, по краям мягкая. Цепочка прозрачных шариков смотрелась бусами.
+const CAMERA_POS := Vector3(0, -3.5, 14)
+const TRAIL_LENGTH := 2.4
+const TRAIL_SEGMENTS := 24
+
+
 func add_shot(scene: Node3D, pos: Vector3, back: Vector3, color: Color) -> void:
 	var ball := MeshInstance3D.new()
 	var mesh := SphereMesh.new()
@@ -397,21 +409,42 @@ func add_shot(scene: Node3D, pos: Vector3, back: Vector3, color: Color) -> void:
 	ball.material_override = glossy(color.lightened(0.15))
 	ball.position = pos
 	scene.add_child(ball)
+
 	var dir := back.normalized()
-	for i in 10:
-		var puff := MeshInstance3D.new()
-		var puff_mesh := SphereMesh.new()
-		var r := 0.42 * (1.0 - i / 11.0)
-		puff_mesh.radius = r
-		puff_mesh.height = r * 2.0
-		puff.mesh = puff_mesh
-		var mat := StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.albedo_color = Color(1, 1, 1, 0.45 * (1.0 - i / 10.0))
-		puff.material_override = mat
-		puff.position = pos + dir * (0.35 + i * 0.25)
-		scene.add_child(puff)
+	# Полоса развёрнута к камере, поперёк неё — три точки: край, середина, край.
+	var side := dir.cross(CAMERA_POS - pos).normalized()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in TRAIL_SEGMENTS + 1:
+		var t := float(i) / TRAIL_SEGMENTS
+		var center := pos + dir * (0.1 + t * TRAIL_LENGTH)
+		# Ширина: у снаряда почти как он сам, к хвосту в ноль (плавно, не клином).
+		var half := 0.42 * pow(1.0 - t, 0.8)
+		var alpha := 0.85 * pow(1.0 - t, 1.6)
+		for k in 3:
+			var across := float(k - 1)
+			st.set_color(Color(1, 1, 1, alpha if k == 1 else 0.0))
+			st.add_vertex(center + side * half * across)
+	for i in TRAIL_SEGMENTS:
+		for k in 2:
+			var a := i * 3 + k
+			var b := a + 3
+			st.add_index(a)
+			st.add_index(b)
+			st.add_index(a + 1)
+			st.add_index(a + 1)
+			st.add_index(b)
+			st.add_index(b + 1)
+	var trail := MeshInstance3D.new()
+	trail.mesh = st.commit()
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.vertex_color_use_as_albedo = true
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	trail.material_override = mat
+	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	scene.add_child(trail)
 
 
 func glossy(color: Color) -> StandardMaterial3D:
@@ -419,5 +452,5 @@ func glossy(color: Color) -> StandardMaterial3D:
 	mat.albedo_color = color
 	mat.roughness = 0.25
 	mat.rim_enabled = true
-	mat.rim = 0.3
+	mat.rim = 0.15
 	return mat
