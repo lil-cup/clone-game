@@ -73,7 +73,9 @@ func _ready() -> void:
 	bullet_mesh.radial_segments = 12
 	bullet_mesh.rings = 6
 	piece_mesh = RoundedBox.make(grid.BLOCK_SIZE, grid.BLOCK_RADIUS, 1)
-	if OS.has_feature("web"):
+	# Только телефоны: на компьютере видеокарта тянет полное разрешение, а 600 точек
+	# на большом экране выглядят мыльно.
+	if OS.has_feature("web_android") or OS.has_feature("web_ios"):
 		fit_3d_resolution()
 		get_window().size_changed.connect(fit_3d_resolution)
 	slots.resize(Level.SLOTS)
@@ -582,7 +584,7 @@ func bottom_edge() -> float:
 
 
 func slot_position(i: int) -> Vector3:
-	return Vector3((i - (slots.size() - 1) / 2.0) * SLOT_STEP, 0, bottom_edge() + 4.9)
+	return Vector3((i - (slots.size() - 1) / 2.0) * SLOT_STEP, 0, bottom_edge() + 5.5)
 
 
 # Сдвигает стрелков в слотах влево, чтобы свободные места всегда были справа.
@@ -597,7 +599,7 @@ func compact_slots() -> void:
 
 
 func column_position(c: int, tier: int) -> Vector3:
-	return Vector3((c - (Level.COLUMNS - 1) / 2.0) * COLUMN_STEP.x, 0, bottom_edge() + 9.9 + tier * COLUMN_STEP.y)
+	return Vector3((c - (Level.COLUMNS - 1) / 2.0) * COLUMN_STEP.x, 0, bottom_edge() + 10.7 + tier * COLUMN_STEP.y)
 
 
 func layout_columns(animated: bool) -> void:
@@ -713,8 +715,8 @@ func fit_camera() -> void:
 
 # Значок счётчика — над слотами, по центру, в масштабе поля.
 func place_belt_badge() -> void:
-	var a := camera.unproject_position(Vector3(0, 0, bottom_edge() + 1.6))
-	var b := camera.unproject_position(Vector3(1, 0, bottom_edge() + 1.6))
+	var a := camera.unproject_position(Vector3(0, 0, bottom_edge() + 0.2))
+	var b := camera.unproject_position(Vector3(1, 0, bottom_edge() + 0.2))
 	var size := Vector2(110, 64)
 	belt_badge.size = size
 	belt_badge.pivot_offset = size / 2.0
