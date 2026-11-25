@@ -11,7 +11,8 @@ const SPACING := 2.6         # расстояние между стрелкам�
 const MOVE_TIME := 0.3
 const COLUMN_STEP := Vector2(4.6, 3.6)
 const SLOT_STEP := 4.0
-const BIG := 1.5             # стрелки внизу крупнее, чем на ленте
+const BIG := 1.75            # пушки в колонках и слотах крупнее, чем на ленте
+const BELT_SCALE := 1.2      # размер пушки на ленте
 const CAMERA_TILT := 62.0    # угол камеры к полу в градусах: 90 — строго сверху, меньше — видны бока блоков
 const BOARD_COLOR := Color("2a2942")
 const SLOT_COLOR := Color("2a2942")
@@ -290,7 +291,7 @@ func try_enter() -> void:
 	var t := move(s, conveyor.point(0.0))
 	t.parallel().tween_property(s, "rotation:y", nearest_turn(s.rotation.y, rotation_towards(conveyor.inward(0.0))), MOVE_TIME)
 	s.face_player(false)
-	t.parallel().tween_property(s, "scale", Vector3.ONE, MOVE_TIME)
+	t.parallel().tween_property(s, "scale", Vector3.ONE * BELT_SCALE, MOVE_TIME)
 	t.tween_callback(func():
 		entering -= 1
 		s.state = Shooter.State.ON_BELT
@@ -615,7 +616,7 @@ func layout_columns(animated: bool) -> void:
 # Ожидающие въезда стоят стопкой под точкой въезда.
 func layout_pending() -> void:
 	for i in pending.size():
-		move(pending[i], conveyor.point(0.0) * Vector3(1, 0, 1) + Vector3(0, 0, 2.6 * (i + 1)))
+		move(pending[i], conveyor.point(0.0) * Vector3(1, 0, 1) + Vector3(0, 0, 3.0 * (i + 1)))
 
 
 func move(s: Shooter, to: Vector3) -> Tween:

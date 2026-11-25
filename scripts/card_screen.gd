@@ -45,10 +45,10 @@ static func buy_booster(id: String, bought: Callable, cancelled: Callable) -> Ca
 	var coins := Progress.coins()
 	if coins >= Progress.BOOSTER_PRICE:
 		screen.caption_text = BoosterBar.caption(id)
-		screen.button_text = "За %d" % Progress.BOOSTER_PRICE
+		screen.button_text = "За %d @" % Progress.BOOSTER_PRICE
 		screen.on_ok = bought
 	else:
-		screen.caption_text = "Нужно %d монет,\nа у тебя %d" % [Progress.BOOSTER_PRICE, coins]
+		screen.caption_text = "Нужно %d @\nа у тебя %d @" % [Progress.BOOSTER_PRICE, coins]
 		screen.button_text = "Понятно"
 		screen.on_ok = cancelled
 	screen.painter = func(c: CanvasItem): BoosterBar.draw_icon(id, c, Vector2.ZERO, 92.0)
@@ -129,12 +129,17 @@ func build() -> void:
 		rays.position = stage.size / 2.0
 		icon.position = stage.size / 2.0)
 
-	body.add_child(outlined(caption_text, 36, 10))
+	if "@" in caption_text:
+		body.add_child(UI.coin_text(caption_text, 36, func(t: String) -> Label: return outlined(t, 36, 10)))
+	else:
+		body.add_child(outlined(caption_text, 36, 10))
 
 	# Кнопка в обёртке: контейнер сбрасывает масштаб детям, а ей нужно выпрыгнуть.
 	button = UI.button(button_text, UI.GREEN, ok, Vector2(360, 110), 54, 32)
 	button.add_theme_color_override("font_outline_color", ResultScreen.OUTLINE)
 	button.add_theme_constant_override("outline_size", 14)
+	if "@" in button_text:
+		UI.put_price(button, button_text)
 	var holder := Control.new()
 	holder.custom_minimum_size = button.get_combined_minimum_size()
 	holder.size_flags_horizontal = SIZE_SHRINK_CENTER

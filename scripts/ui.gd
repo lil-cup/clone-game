@@ -100,6 +100,54 @@ static func button(text: String, color: Color, action: Callable, min_size := Vec
 	return b
 
 
+# Текст с монетками: «@» в тексте заменяется нарисованной монеткой, как в счётчике монет,
+# чтобы цена читалась как монеты, а не просто число. make_label(text) делает подпись в нужном стиле.
+static func coin_text(text: String, font_size: int, make_label: Callable) -> VBoxContainer:
+	var lines := VBoxContainer.new()
+	lines.alignment = BoxContainer.ALIGNMENT_CENTER
+	lines.add_theme_constant_override("separation", 0)
+	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for line in text.split("\n"):
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", int(font_size * 0.22))
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var parts := line.split("@")
+		for i in parts.size():
+			var part := parts[i].strip_edges()
+			if part != "":
+				var l: Label = make_label.call(part)
+				l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				row.add_child(l)
+			if i < parts.size() - 1:
+				var coin := CoinIcon.make(font_size * 1.05)
+				coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				row.add_child(coin)
+		lines.add_child(row)
+	return lines
+
+
+# Цена на кнопке: текст кнопки заменяется строкой с монеткой в том же стиле (размер, тень, обводка).
+# Вызывать после того, как кнопке выставлены все цвета и обводка.
+static func put_price(b: Button, text: String) -> void:
+	var font_size := b.get_theme_font_size("font_size")
+	var shadow := b.get_theme_color("font_shadow_color")
+	var outline := b.get_theme_constant("outline_size")
+	var outline_color := b.get_theme_color("font_outline_color")
+	b.text = ""
+	var row := coin_text(text, font_size, func(t: String) -> Label:
+		var l := label(t, font_size)
+		l.add_theme_color_override("font_shadow_color", shadow)
+		l.add_theme_constant_override("shadow_offset_y", 3)
+		if outline > 0:
+			l.add_theme_color_override("font_outline_color", outline_color)
+			l.add_theme_constant_override("outline_size", outline)
+		return l)
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	row.offset_bottom = -8  # тёмная «подошва» снизу кнопки не в счёт
+	b.add_child(row)
+
+
 # Короткий «тук» при нажатии любой кнопки. Один плеер на всю игру живёт в корне дерева,
 # поэтому звук не обрывается, когда кнопка переключает сцену.
 static func play_click(from: Node) -> void:

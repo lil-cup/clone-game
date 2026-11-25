@@ -43,6 +43,7 @@ var settings_panel: ColorRect
 var settings_buttons: VBoxContainer
 var settings_title: Label
 var settings_text: Label
+var settings_coins: VBoxContainer  # подпись с монетками вместо settings_text, когда в ней цена
 
 
 func _ready() -> void:
@@ -481,6 +482,8 @@ func make_settings_panel() -> void:
 	box.add_child(settings_title)
 	settings_text = UI.label("", 30)
 	box.add_child(settings_text)
+	settings_coins = VBoxContainer.new()
+	box.add_child(settings_coins)
 	settings_buttons = VBoxContainer.new()
 	settings_buttons.add_theme_constant_override("separation", 14)
 	box.add_child(settings_buttons)
@@ -488,12 +491,22 @@ func make_settings_panel() -> void:
 
 func show_settings_card(title: String, text: String, actions: Array) -> void:
 	settings_title.text = title
-	settings_text.text = text
-	settings_text.visible = text != ""
+	# Текст с ценой («@» — монетка) собирается из подписей и монеток, обычный — одной подписью.
+	for row in settings_coins.get_children():
+		row.queue_free()
+	var with_coins := "@" in text
+	settings_text.text = "" if with_coins else text
+	settings_text.visible = text != "" and not with_coins
+	settings_coins.visible = with_coins
+	if with_coins:
+		settings_coins.add_child(UI.coin_text(text, 30, func(t: String) -> Label: return UI.label(t, 30)))
 	for b in settings_buttons.get_children():
 		b.queue_free()
 	for a in actions:
-		settings_buttons.add_child(UI.button(a[0], a[1], a[2]))
+		var b := UI.button(a[0], a[1], a[2])
+		if "@" in a[0]:
+			UI.put_price(b, a[0])
+		settings_buttons.add_child(b)
 	if not settings_panel.visible:
 		settings_panel.show()
 		settings_panel.modulate.a = 0.0
@@ -524,9 +537,9 @@ func offer_life(title := "Ещё жизнь", after := Callable()) -> void:
 	var text := "Новая жизнь через " + Progress.format_wait(Progress.next_life_in())
 	var actions := []
 	if Progress.coins() >= Progress.LIFE_PRICE:
-		actions.append(["Купить за %d" % Progress.LIFE_PRICE, UI.GREEN, buy_life.bind(after)])
+		actions.append(["Купить за %d @" % Progress.LIFE_PRICE, UI.GREEN, buy_life.bind(after)])
 	else:
-		text += "\nили купи за %d монет —\nпока их %d" % [Progress.LIFE_PRICE, Progress.coins()]
+		text += "\nили купи за %d @\nпока их %d @" % [Progress.LIFE_PRICE, Progress.coins()]
 	actions.append(["Назад", UI.PURPLE, settings_panel.hide])
 	show_settings_card(title, text, actions)
 

@@ -11,12 +11,11 @@ const BADGE := Color("1b4fc4")
 const BADGE_EMPTY := Color("4cc46a")
 const SIZE := Vector2(124, 124)
 
-# id — какой бустер ("" — ещё не придуман, просто замок), level — с какого уровня (с единицы).
+# id — какой бустер, level — с какого уровня (с единицы); до него ячейка под замком.
 const KINDS := [
 	{"id": "slot", "level": 3},
 	{"id": "pick", "level": 9},
 	{"id": "shuffle", "level": 15},
-	{"id": "", "level": 21},
 ]
 
 # Цвета значков.
