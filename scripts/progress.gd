@@ -11,7 +11,7 @@ const LEVEL_REWARD := 40
 # Жизни: проигрыш или выход из уровня стоит одной, без жизней играть нельзя.
 const MAX_LIVES := 5
 const LIFE_SECONDS := 24 * 60 * 60  # за сколько восстанавливается одна жизнь (сутки)
-const FREE_LEVELS := 10        # на стольких первых уровнях жизни бесконечные
+const FREE_LEVELS := 1         # на обучении (первом уровне) жизни не тратятся
 const LIFE_PRICE := 800        # жизнь можно купить за монеты
 const BOOSTER_PRICE := 400     # любой бустер тоже
 
@@ -133,11 +133,6 @@ static func format_wait(seconds: int) -> String:
 
 static func now() -> int:
 	return int(Time.get_unix_time_from_system())
-
-
-# Пока игрок на первых уровнях, жизни бесконечные.
-static func lives_infinite() -> bool:
-	return completed() < FREE_LEVELS
 
 
 static func reset() -> void:

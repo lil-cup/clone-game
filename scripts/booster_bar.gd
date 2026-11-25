@@ -179,14 +179,22 @@ func use(id: String) -> void:
 				game.start_picking()
 
 
-# Бустеров этого вида нет — предлагаем купить; купленный сразу применяется.
+# Бустеров этого вида нет — предлагаем купить. Купленный добавляется к счётчику,
+# а применяется, как обычно, нажатием на бустер.
 func offer(id: String) -> void:
 	game.get_tree().paused = true
 	game.hud.add_child(CardScreen.buy_booster(id, func():
 		game.get_tree().paused = false
 		if Progress.buy_booster(id):
 			refresh()
-			use(id), func(): game.get_tree().paused = false))
+			bump(buttons[id].badge), func(): game.get_tree().paused = false))
+
+
+# Кружок со счётчиком подпрыгивает, чтобы было видно, что бустер прибавился.
+func bump(badge: Control) -> void:
+	var t := badge.create_tween()
+	t.tween_property(badge, "scale", Vector2.ONE * 1.5, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(badge, "scale", Vector2.ONE, 0.2)
 
 
 func spend(id: String) -> void:

@@ -302,7 +302,7 @@ func make_lives_counter() -> PanelContainer:
 	# Нажатие на счётчик предлагает купить жизнь.
 	panel.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			if not Progress.lives_infinite() and Progress.lives() < Progress.MAX_LIVES:
+			if Progress.lives() < Progress.MAX_LIVES:
 				UI.play_click(self)
 				offer_life())
 	return panel
@@ -311,30 +311,13 @@ func make_lives_counter() -> PanelContainer:
 func draw_lives_heart() -> void:
 	var c := lives_heart.size / 2.0
 	UI.draw_heart(lives_heart, c - Vector2(0, 5), 50.0)
-	if Progress.lives_infinite():
-		draw_infinity(lives_heart, c + Vector2(0, -3), 14.0)
-		return
 	var font := UI.number_font()
 	var at := c + Vector2(-30, 7)
 	lives_heart.draw_string_outline(font, at, str(lives_shown), HORIZONTAL_ALIGNMENT_CENTER, 60, 30, 10, ResultScreen.OUTLINE)
 	lives_heart.draw_string(font, at, str(lives_shown), HORIZONTAL_ALIGNMENT_CENTER, 60, 30, Color.WHITE)
 
 
-# Знак бесконечности (лемниската) белым с тёмной обводкой.
-func draw_infinity(c: Control, center: Vector2, a: float) -> void:
-	var points := PackedVector2Array()
-	for i in 49:
-		var t := TAU * i / 48
-		var d := 1.0 + sin(t) * sin(t)
-		points.append(center + Vector2(a * cos(t) / d, a * sin(t) * cos(t) / d))
-	c.draw_polyline(points, ResultScreen.OUTLINE, 10, true)
-	c.draw_polyline(points, Color.WHITE, 4.5, true)
-
-
 func update_lives() -> void:
-	if Progress.lives_infinite():
-		lives_label.text = "Безлимит"
-		return
 	var lives := Progress.lives()
 	if lives != lives_shown:
 		lives_shown = lives
